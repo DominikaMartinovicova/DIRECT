@@ -1,0 +1,29 @@
+# Ignore everything by default
+*
+
+# But keep directories (so we can include files inside)
+!*/
+
+# Include script files (adjust extensions if needed)
+!*.py
+!*.sh
+!*.R
+!*.ipynb
+
+# Include sbatch/job submission files
+!*.sbatch
+!*.job
+
+# Optional: include README or config
+!README.md
+!*.cfg
+!*.conf
+
+# Ignore temporary/output/data files
+*.o*
+*.e*
+*.out
+*.log
+results/
+data/
+tmp/
