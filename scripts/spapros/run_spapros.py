@@ -63,5 +63,14 @@ evaluator.evaluate_probeset(valid_genes, set_id='xenium_io')
 print(evaluator.summary_results)
 
 # Plot
-evaluator.plot_summary(save='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/plot_summary_5k.png', dpi=300)
-evaluator.plot_confusion_matrix(save='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/plot_conf_matrix_5k.png', dpi=300)
+fig = evaluator.plot_summary(set_ids='all')
+fig.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/plot_summary_5k.png', dpi=300, bbox_inches='tight')
+plt.close(fig)
+
+fig = evaluator.plot_confusion_matrix(set_ids='all')
+fig.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/plot_conf_matrix_5k.png', dpi=300, bbox_inches='tight')
+plt.close(fig)
+
+fig = evaluator.plot_marker_corr(set_ids='all')
+fig.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/plot_marker_corr_5k.png', dpi=300, bbox_inches='tight')
+plt.close()
