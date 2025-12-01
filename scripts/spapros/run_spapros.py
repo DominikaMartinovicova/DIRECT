@@ -4,6 +4,7 @@ import pandas as pd
 import scanpy as sc
 import spapros as sp
 import matplotlib.pyplot as plt
+import numpy as np
 
 sc.settings.verbosity = 1
 sc.logging.print_header()
@@ -31,6 +32,26 @@ missing = set(gene_list) - set(valid_genes)
 
 print("Missing genes:", missing)
 print("Using", len(valid_genes), "valid genes")
+
+# Detect genes with zero variance
+stds = np.std(adata.X.toarray(), axis=0)
+zero_var_genes = np.where(stds == 0)[0]
+zero_var_gene_names = adata.var_names[zero_var_genes]
+
+print("Zero-variance genes:", zero_var_gene_names)
+print("Count:", len(zero_var_genes))
+
+zero_var_in_list = [g for g in zero_var_gene_names if g in gene_list]
+print("Zero-variance genes in the gene list:", zero_var_in_list)
+
+# Remove zero-variance genes from valid_genes
+valid_genes = [g for g in valid_genes if g not in zero_var_gene_names]
+print("Using", len(valid_genes), "valid genes after removing zero-variance genes")
+
+
+
+
+
 
 # Set up an Evaluator
 print('Initiating evaluator...')
