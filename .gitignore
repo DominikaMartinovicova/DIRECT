@@ -10,6 +10,9 @@
 !*.R
 !*.ipynb
 
+# Include the Snakefile
+!Snakefile
+
 # Include sbatch/job submission files
 !*.sbatch
 !*.job
