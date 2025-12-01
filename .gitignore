@@ -1,7 +1,7 @@
 # Ignore everything by default
 *
 
-# But keep directories (so we can include files inside)
+# Keep directories (so we can include files inside)
 !*/
 
 # Include script files (adjust extensions if needed)
@@ -30,3 +30,5 @@
 results/
 data/
 tmp/
+plots/
+output/
