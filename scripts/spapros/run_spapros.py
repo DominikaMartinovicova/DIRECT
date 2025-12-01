@@ -34,7 +34,7 @@ print("Using", len(valid_genes), "valid genes")
 
 # Set up an Evaluator
 print('Initiating evaluator...')
-evaluator = sp.ev.ProbesetEvaluator(adata, celltype_key='Neutro_Epi_extImm', scheme="full", verbosity=2, results_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/spapros_results')
+evaluator = sp.ev.ProbesetEvaluator(adata, celltype_key='Neutro_Epi_extImm', scheme="full", verbosity=2, results_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k')
 
 print('Evaluating...')
 evaluator.evaluate_probeset(valid_genes, set_id='xenium_io')
