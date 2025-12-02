@@ -1,10 +1,14 @@
 #
+# Cell segmentation using cellpose on morphology images from 10X Xenium data
 #
+# Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
 #
-#
-#
-#
+# Usage:
+#        python cellpose_segmentation.py
 
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 0 Import libraries
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -22,8 +26,10 @@ from rasterio import features
 from sklearn.metrics import jaccard_score
 from skimage.measure import regionprops_table
 
-
-# Set up plotting aesthetics
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 1 Load the data
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Set up plotting aesthetics and variables
 sns.set(style='whitegrid')
 slide = 'slide_6'
 os.chdir(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/data/raw/{slide}/')
@@ -38,16 +44,9 @@ with tifffile.TiffFile(image_data_path) as tif:
     ome_metadata = tif.ome_metadata
     print(ome_metadata)
 
-
-# Preview the transcripts data 
-# transcriptomics_data_path = 'transcripts.csv.gz'
-# data = pd.read_csv(transcriptomics_data_path, compression='gzip')
-# print(data.head())
-
+# Preview the transcripts data
 data = pd.read_parquet('transcripts.parquet')
-#df.to_csv('transcripts.csv.gz', index=False, compression='gzip')
 print(data.head())
-
 
 # Select dimensions to analyze
 print(f"Image dimensions: {image.ndim}")
@@ -69,7 +68,6 @@ print(f'Image shape: {image.shape}')
 print(f'Image channel shape: {image_channel.shape}')
 print(f'np.max: {np.max(image, axis=0)}')
 
-
 image_channel = np.max(image, axis=0)
 image_channel = image_channel.astype(np.uint16)
 
@@ -79,9 +77,27 @@ plt.title('Selected Image for Segmentation')
 plt.axis('off')
 plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_image.png', dpi=300)
 
-# Use scaling factor from the image metadata 
-x_scale = 1 / 0.2125  # pixels per µm (each micrometer contains approx 4.7 pixels)
-y_scale = 1 / 0.2125  # pixels per µm
+# Use the whole image for segmentation (no ROI)
+# image_channel already contains the 2D image we'll use
+image_for_seg = image_channel
+image_height, image_width = image_channel.shape
+
+# Use scaling factor from the image metadata (pixels per µm)
+x_scale = 1 / 0.2125  # pixels per µm (approx 4.7059 px/µm)
+y_scale = x_scale
+
+# Map transcripts to the whole image (convert µm -> pixels)
+# Keep original `data` but add pixel coordinates for mapping
+data['x_pixel'] = (data['x_location'] * x_scale).astype(int)
+data['y_pixel'] = (data['y_location'] * y_scale).astype(int)
+
+print(f"Using full image for segmentation: shape={image_for_seg.shape}")
+
+plt.figure(figsize=(8, 8))
+plt.imshow(image_for_seg)
+plt.title('Whole Image for Segmentation')
+plt.axis('off')
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_whole_image_for_segmentation.png', dpi=300)
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Cell pose
@@ -97,45 +113,53 @@ print(f"Estimated cell diameter in pixels: {cell_diameter_pixels}")
 # - `flows`: which provides information about cell boundary flows,  
 # - `styles`: representing style vectors for detected objects, and
 # - `diams`: the diameter used in the model (helpful if it has been automatically adjusted).
-masks, flows, styles = model.eval(image_channel, diameter=cell_diameter_pixels,)
-print(f"Number of cells detected: {masks.max()}")
+masks, flows, styles = model.eval(image_for_seg, diameter=cell_diameter_pixels,)
+print(f"Number of cells detected in image: {masks.max()}")
 
+# Locate transcripts to the corresponding cells (use pixel coordinates added to `data`)
+x_indices = data['x_pixel'].values
+y_indices = data['y_pixel'].values
 
+# Image dimensions
+img_height, img_width = image_for_seg.shape
 
-# Assign each transcript to a segmented cell based on its pixel coordinates, linking gene expression data to specific cells within the ROI.
-cell_labels = masks[y_indices, x_indices]       # Cell labels for each transcript
-roi_data['cellpose_cell_id'] = cell_labels      # Add cell labels to the data
-print(roi_data.head())      # Preview
+# Clip indices to image bounds
+x_indices = np.clip(x_indices, 0, img_width - 1)
+y_indices = np.clip(y_indices, 0, img_height - 1)
 
+# Assign each transcript to a segmented cell based on its pixel coordinates
+cell_labels = masks[y_indices, x_indices]
+data['cellpose_cell_id'] = cell_labels
+print(data.head())
 
 # Keep only transcripts assigned to a cell
-assigned_data = roi_data[roi_data['cellpose_cell_id'] > 0].copy()
-print(f"Total transcripts in ROI: {len(roi_data)}")
+assigned_data = data[data['cellpose_cell_id'] > 0].copy()
+print(f"Total transcripts in image: {len(data)}")
 print(f"Assigned transcripts: {len(assigned_data)}")
 
-# Visualize the segmentation overlayed on the ROI image
+# Visualize the segmentation overlayed on the image
 fig = plt.figure(figsize=(50, 50))
-plot.show_segmentation(fig, roi_image, masks, flows[0])
-plt.title('Cellpose Segmentation on ROI', fontsize=40)
-fig.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_test_ROI_segmentation.png', dpi=300)
+plot.show_segmentation(fig, image_for_seg, masks, flows[0])
+plt.title('Cellpose Segmentation', fontsize=40)
+fig.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_segmentation.png', dpi=300)
 
 # Group by cell and gene to get expression counts
 expression_per_cell = assigned_data.groupby(['cellpose_cell_id', 'feature_name']).size().reset_index(name='count')
 expression_matrix = expression_per_cell.pivot(index='cellpose_cell_id', columns='feature_name', values='count').fillna(0)
 print(expression_matrix.head())
 
-# Visualize the transcript locations overlayed on the ROI image
+# Visualize the transcript locations overlayed on the image
 plt.figure(figsize=(20, 20))
-plt.imshow(roi_image, cmap='gray')
+plt.imshow(image_for_seg, cmap='gray')
 plt.scatter(
-    x_indices[roi_data['cellpose_cell_id'] > 0],
-    y_indices[roi_data['cellpose_cell_id'] > 0],
+    x_indices[data['cellpose_cell_id'] > 0],
+    y_indices[data['cellpose_cell_id'] > 0],
     c='red', s=5, label='Transcripts'
 )
 plt.title('Transcripts Mapped to Segmented Cells')
 plt.axis('off')
 plt.legend()
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_test_ROI_transcript_loc.png', dpi=300)
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_transcript_loc.png', dpi=300)
 
 # Visualize GOI
 gene_of_interest = 'CD3D'
@@ -184,43 +208,26 @@ boundaries_path = 'nucleus_boundaries.csv.gz'
 boundaries = pd.read_csv(boundaries_path)
 print(boundaries.head())
 
-# Extract ROI from 10X and resize it to make it comparable to cellpose
-scale_factor = 0.05
-image_height, image_width = image_channel.shape
-roi_width = int(image_width * scale_factor)
-roi_height = int(image_height * scale_factor)
-
-roi_width -= roi_width % 2
-roi_height -= roi_height % 2
-
-x_center = image_width // 5
-y_center = image_height // 5
-
-x_start = x_center - roi_width // 2
-x_end = x_center + roi_width // 2
-y_start = y_center - roi_height // 2
-y_end = y_center + roi_height // 2
-
-# Convert pixel coordinates to micrometers
-x_scale = 1 / 0.2125  
-y_scale = 1 / 0.2125
-x_start_um = x_start / x_scale
-x_end_um = x_end / x_scale
-y_start_um = y_start / y_scale
-y_end_um = y_end / y_scale
+# Use full image to compare 10X segmentation (no ROI)
+# Convert image bounds to micrometers
+image_height, image_width = image_for_seg.shape
+x_start_um = 0.0
+y_start_um = 0.0
+x_end_um = image_width / x_scale
+y_end_um = image_height / y_scale
 
 # Filter cells whose centroids are within the ROI 
-cells_in_roi = cells_data[
+cells_in_image = cells_data[
     (cells_data['x_centroid'] >= x_start_um) &
     (cells_data['x_centroid'] < x_end_um) &
     (cells_data['y_centroid'] >= y_start_um) &
     (cells_data['y_centroid'] < y_end_um)].copy()
-print(f"Number of cells in ROI from original segmentation: {len(cells_in_roi)}")
+print(f"Number of cells in ROI from original segmentation: {len(cells_in_image)}")
 
 # Filter cell boundaries for cells in ROI
-boundaries_in_roi = boundaries[boundaries['cell_id'].isin(cells_in_roi['cell_id'])].copy()
+boundaries_in_image = boundaries[boundaries['cell_id'].isin(cells_in_image['cell_id'])].copy()
 cell_polygons = {}
-for cell_id, group in boundaries_in_roi.groupby('cell_id'):
+for cell_id, group in boundaries_in_image.groupby('cell_id'):
     x_coords = group['vertex_x'].values
     y_coords = group['vertex_y'].values
     coords = list(zip(x_coords, y_coords))
@@ -235,13 +242,11 @@ for cell_id, group in boundaries_in_roi.groupby('cell_id'):
 
 # Function to transform geometries to pixel coordinates
 def geometry_to_pixel_coords(geometry):
-    # shift geometry to ROI coordinates (subtract ROI origin in micrometers)
-    geometry_shifted = translate(geometry, xoff=-x_start_um, yoff=-y_start_um)
     # scale geometry from micrometers to pixels
-    geometry_scaled = scale(geometry_shifted, xfact=x_scale, yfact=y_scale, origin=(0, 0))
+    geometry_scaled = scale(geometry, xfact=x_scale, yfact=y_scale, origin=(0, 0))
     return geometry_scaled
 
-# Appply transformation to all cell polygons
+# Apply transformation to all cell polygons
 cell_polygons_px = {cell_id: geometry_to_pixel_coords(geom) for cell_id, geom in cell_polygons.items()}
 
 # Map cell_id strings to integer labels
@@ -252,7 +257,7 @@ label_to_cell_id = {idx+1: cell_id for idx, cell_id in enumerate(cell_polygons_p
 shapes = [(geom, cell_id_to_label[cell_id]) for cell_id, geom in cell_polygons_px.items()]
 
 # Create an empty mask and rasterize the shapes
-original_masks = np.zeros_like(roi_image, dtype=np.uint16)
+original_masks = np.zeros_like(image_for_seg, dtype=np.uint16)
 original_masks = features.rasterize(
     shapes,
     out_shape=original_masks.shape,
