@@ -26,7 +26,7 @@ print(f"spapros=={sp.__version__}")
 # 1 Load scRNAseq dataset and probeset
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Load data
-adata = sc.read_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/NSCLC/scRNAseq/data/final_scRNAseq_atlas_Salcher_5k.h5ad')
+adata = sc.read_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/NSCLC/scRNAseq/data/final_scRNAseq_atlas_Salcher.h5ad')
 print(adata)
 gene_list = pd.read_csv("/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/raw/slide_3/cell_feature_matrix/features.tsv.gz", 
                  sep="\t", 
@@ -64,7 +64,7 @@ print("Using", len(valid_genes), "valid genes after removing zero-variance genes
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Set up an Evaluator
 print('Initiating evaluator...')
-evaluator = sp.ev.ProbesetEvaluator(adata, celltype_key='Neutro_Epi_extImm', scheme="full", verbosity=2, results_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k')
+evaluator = sp.ev.ProbesetEvaluator(adata, celltype_key='Neutro_Epi_extImm', scheme="full", verbosity=2, results_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros')
 
 print('Evaluating...')
 evaluator.evaluate_probeset(valid_genes, set_id='xenium_io')
@@ -77,12 +77,12 @@ print(evaluator.summary_results)
 # Plot
 plt.figure()
 evaluator.plot_summary()
-plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/plot_summary_5k.png', dpi=300, bbox_inches='tight')
+plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/plot_summary.png', dpi=300, bbox_inches='tight')
 plt.close()
 
 plt.figure()
 evaluator.plot_confusion_matrix()
-plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/plot_conf_matrix_5k.png', dpi=300, bbox_inches='tight')
+plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/plot_conf_matrix.png', dpi=300, bbox_inches='tight')
 plt.close()
 
 # plt.figure()
@@ -95,7 +95,7 @@ pickleable_data = {
     "summary": evaluator.summary_results,
 }
 
-with open("/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_5k/evaluator_results.pkl", "wb") as f:
+with open("/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/evaluator_results.pkl", "wb") as f:
     pickle.dump(pickleable_data, f)
 
 

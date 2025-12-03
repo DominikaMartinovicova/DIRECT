@@ -32,7 +32,8 @@ from skimage.measure import regionprops_table
 # Set up plotting aesthetics and variables
 sns.set(style='whitegrid')
 slide = 'slide_6'
-os.chdir(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/data/raw/{slide}/')
+os.chdir(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/raw/{slide}/')
+print(f'--------------------- Analyzing slide: {slide} ---------------------')
 
 # Loading and inspecting the morphology image
 image_data_path = 'morphology.ome.tif'
@@ -50,19 +51,14 @@ print(data.head())
 
 # Select dimensions to analyze
 print(f"Image dimensions: {image.ndim}")
-if image.ndim == 5:
-    # Example shape: (Time, Z, Channels, Height, Width)
-    # Select the first time point, z-slice, and channel
-    image_channel = image[0, 0, 0, :, :]
+if image.ndim == 5:   # Example shape: (Time, Z, Channels, Height, Width)
+    image_channel = image[0, 0, 0, :, :]   # Select the first time point, z-slice, and channel
 elif image.ndim == 4:
-    # Example shape: (Z, Channels, Height, Width)
-    image_channel = image[0, 0, :, :]
+    image_channel = image[0, 0, :, :]    # Example shape: (Z, Channels, Height, Width)
 elif image.ndim == 3:
-    # Example shape: (Channels, Height, Width)
-    image_channel = image[0, :, :]
+    image_channel = image[0, :, :]   # Example shape: (Channels, Height, Width)
 else:
-    # Already a 2D image
-    image_channel = image
+    image_channel = image  # Already a 2D image
 
 print(f'Image shape: {image.shape}')
 print(f'Image channel shape: {image_channel.shape}')
@@ -75,7 +71,7 @@ plt.figure(figsize=(8, 8))
 plt.imshow(image_channel)
 plt.title('Selected Image for Segmentation')
 plt.axis('off')
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_image.png', dpi=300)
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_image.png', dpi=300)
 
 # Use the whole image for segmentation (no ROI)
 # image_channel already contains the 2D image we'll use
@@ -97,7 +93,7 @@ plt.figure(figsize=(8, 8))
 plt.imshow(image_for_seg)
 plt.title('Whole Image for Segmentation')
 plt.axis('off')
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_whole_image_for_segmentation.png', dpi=300)
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_whole_image_for_segmentation.png', dpi=300)
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Cell pose
@@ -141,7 +137,7 @@ print(f"Assigned transcripts: {len(assigned_data)}")
 fig = plt.figure(figsize=(50, 50))
 plot.show_segmentation(fig, image_for_seg, masks, flows[0])
 plt.title('Cellpose Segmentation', fontsize=40)
-fig.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_segmentation.png', dpi=300)
+fig.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_segmentation.png', dpi=300)
 
 # Group by cell and gene to get expression counts
 expression_per_cell = assigned_data.groupby(['cellpose_cell_id', 'feature_name']).size().reset_index(name='count')
@@ -159,7 +155,7 @@ plt.scatter(
 plt.title('Transcripts Mapped to Segmented Cells')
 plt.axis('off')
 plt.legend()
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_transcript_loc.png', dpi=300)
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_transcript_loc.png', dpi=300)
 
 # Visualize GOI
 gene_of_interest = 'CD3D'
@@ -180,20 +176,20 @@ if gene_of_interest in expression_matrix.columns:
     cell_centroids = np.array([centroid_dict.get(cell_id, (np.nan, np.nan)) for cell_id in cell_ids])
 
     plt.figure(figsize=(8, 8))
-    plt.imshow(roi_image, cmap='gray')
+    plt.imshow(image_for_seg, cmap='gray')
     plt.scatter(
         cell_centroids[:, 1],  # x-coordinates
         cell_centroids[:, 0],  # y-coordinates
         c=expression_values,
         cmap='viridis',
         s=5,
-        edgecolors='k',
+        edgecolors='none',
         label=f'Expression of {gene_of_interest}'
     )
     plt.title(f'Expression of {gene_of_interest}')
     plt.axis('off')
     plt.colorbar(label='Expression Level')
-    plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_test_ROI_{gene_of_interest}.png', dpi=300)
+    plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_{gene_of_interest}.png', dpi=300)
 else:
     print(f"{gene_of_interest} not found in expression matrix.")
 
@@ -270,30 +266,30 @@ plt.figure(figsize=(16, 8))
 
 #Cellpose 
 plt.subplot(1, 2, 1)
-plt.imshow(roi_image, cmap='gray')
+plt.imshow(image_for_seg, cmap='gray')
 plt.imshow(masks, alpha=0.5, cmap='jet')
 plt.title('Cellpose Segmentation')
 plt.axis('off')
 
 #Original 
 plt.subplot(1, 2, 2)
-plt.imshow(roi_image, cmap='gray')
+plt.imshow(image_for_seg, cmap='gray')
 plt.imshow(original_masks, alpha=0.5, cmap='jet')
 plt.title('Original 10x Segmentation')
 plt.axis('off')
 
 plt.tight_layout()
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_test_seg_10X_vs_cellpose.png',dpi=300)
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_seg_10X_vs_cellpose.png',dpi=300)
 
 
 # Overlay the cellpose segmentation on the 10x segmentation to see how well they align
 plt.figure(figsize=(8, 8))
-plt.imshow(roi_image, cmap='gray')
+plt.imshow(image_for_seg, cmap='gray')
 plt.imshow((original_masks > 0).astype(int), cmap='Blues', alpha=0.5, label='Original')
 plt.imshow((masks > 0).astype(int), cmap='Reds', alpha=0.5, label='Cellpose')
 plt.title('Overlay of Segmentations')
 plt.axis('off')
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}_test_seg_10X_vs_cellpose_overlay.png', dpi=300)
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_seg_10X_vs_cellpose_overlay.png', dpi=300)
 
 # Convert masks to binary masks (cells vs background)
 cellpose_mask_binary = (masks > 0).astype(int)
@@ -340,7 +336,7 @@ sns.kdeplot(data=areas_df, x='area', hue='method', common_norm=False)
 plt.xlabel('Cell Area (pixels)')
 plt.ylabel('Density')
 plt.title('Cell Size Distribution Comparison')
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT_new/segmentation/plots/{slide}test_seg_10X_vs_cellpose_cellarea.png',dpi=300)
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/segmentation/{slide}_seg_10X_vs_cellpose_cellarea.png',dpi=300)
 
 
 # Save the results to a new file
