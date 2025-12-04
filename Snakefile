@@ -40,7 +40,7 @@ rule compress_Xenium:
     #    "envs/squidpy.yaml"
     shell:
         """
-        python3 scripts/python/compress_Xenium.py \
+        python3 scripts/preprocessing/compress_Xenium.py \
         -i {input.raw_Xenium} \
         --input_dir {params.in_dir} \
         --output_dir {params.out_dir} \
@@ -65,7 +65,7 @@ rule QC_Xenium:
     #    "envs/squidpy.yaml"
     shell:
         """
-        python3 scripts/python/QC_Xenium.py \
+        python3 scripts/preprocessing/QC_Xenium.py \
         -i {input.compressed_Xenium} \
         --input_coords {input.coordinates} \
         --input_meta {input.metadata} \
@@ -93,7 +93,7 @@ rule Tacco:
     #    "envs/tacco.yaml"
     shell:
         """
-        python3 scripts/python/run_tacco.py \
+        python3 scripts/preprocessing/run_tacco.py \
         -i {input.preprocessed_Xenium} \
         --input_atlas {input.scRNAseq_atlas} \
         --input_dir {params.in_dir} \
@@ -116,7 +116,7 @@ rule combine_adatas:
         in_dir = data_dir + "phenotyped/{phenotyping_level}/",
     shell:
         """
-        python3 scripts/python/combine_adatas.py \
+        python3 scripts/preprocessing/combine_adatas.py \
 	    --input_dir {params.in_dir} \
         -o {output.combined_adatas} \
         --output_plot {output.output_plots}
@@ -135,7 +135,7 @@ rule check_phenotyping:
         phen_level = "{phenotyping_level}"
     shell:
         """
-        python3 scripts/python/check_phenotyping.py \
+        python3 scripts/preprocessing/check_phenotyping.py \
 	    -i {input.combined_adatas} \
         --phen_level {params.phen_level} \
         -o {output.checked_adatas} \
