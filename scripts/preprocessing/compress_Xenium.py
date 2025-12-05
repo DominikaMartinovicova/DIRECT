@@ -7,6 +7,16 @@
 #
 # Author: Mischa Steketee (m.f.b.steketee@amsterdamumc.nl)
 #
+# Usage:
+"""
+        python3 scripts/preprocessing/compress_Xenium.py \
+        -i {input.raw_Xenium} \
+        --input_dir {params.in_dir} \
+        --output_dir {params.out_dir} \
+        --threads {threads} \
+        -o {output.compressed_Xenium} 
+"""
+#
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 0.1  Import Libraries
 #-------------------------------------------------------------------------------
@@ -23,7 +33,7 @@ def parse_args():
     "Parse inputs from commandline and returns them as a Namespace object."
     parser = argparse.ArgumentParser(prog = 'python3 compress_Xenium.py',
         formatter_class = argparse.RawTextHelpFormatter, description =
-        '  Create celltype specific signature matrices  ')
+        '  Convert raw Xenium data to compressed .zarr  ')
     parser.add_argument('-i', help='path to cell feature',
                         dest='input',
                         type=str)

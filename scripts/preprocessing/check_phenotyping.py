@@ -3,14 +3,18 @@
 # check_phenotyping.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
+#   Check marker gene expression in cell types. 
 #
-#
+#   0 Import libraries and parse arguments
+#   1 Read data
+#   2 Plotting - UMAP, dotplot, violinplot
+#   3 Save
 #
 # Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
 #
 # Usage:
 """
-        python3 scripts/python/check_phenotyping.py \
+        python3 scripts/preprocessing/check_phenotyping.py \
         -i {input.combined_adatas} \
         -o {output.checked_adatas} \
         --output_plot {params.out_plot_dir}
@@ -36,7 +40,7 @@ def parse_args():
     "Parse inputs from commandline and returns them as a Namespace object."
     parser = argparse.ArgumentParser(prog = 'python3 check_phenotyping.py',
         formatter_class = argparse.RawTextHelpFormatter, description =
-        '  Create celltype specific signature matrices  ')
+        '  Check marker gene expression in cell types  ')
     parser.add_argument('-i', help='path to combined Xenium dirs metadata file',
                         dest='input',
                         type=str)
@@ -60,6 +64,7 @@ os.makedirs(args.output_plot, exist_ok=True)
 os.makedirs(args.output_plot + '/violinplots/', exist_ok=True)
 os.makedirs(args.output_plot + '/dotplots/', exist_ok=True)
 os.makedirs(args.output_plot + '/umaps/', exist_ok=True)
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Read data
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -70,7 +75,6 @@ adata_combined= sc.read_h5ad(args.input)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Plotting
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 # Plot UMAP with celltypes and clinical labels
 #-------------------------------------------------------------------------------
 print('Plotting...')
@@ -78,10 +82,10 @@ colors = [args.phen_level, 'slide','sample_type', 'pt_id']
 
 for color in colors:
     sc.pl.umap(adata_combined, color=color, show = False, size=5, layer='raw_counts')
-    plt.savefig(args.output_plot + '/UMAP_' + color + '.png', bbox_inches='tight')
+    plt.savefig(args.output_plot + '/umaps/UMAP_' + color + '.png', bbox_inches='tight')
     plt.close()
 
-# Plot UMAP with gene expression
+# Define all relevant markers 
 #-------------------------------------------------------------------------------
 markers = [
     # B cell
@@ -97,14 +101,10 @@ markers = [
     'AIF1','CD44', 'CD68', 'CD74', 'CDKN1A', 'CDKN1B', 'CDKN2A', 'CDKN2B', 'CDKN2C', 'CDKN2D', 'CXCL1', 'CXCL5', 'FCGR1A', 'FLT1', 'GLIPR2', 'IL4', 'MARCO', 'VCAN',
     # Mast cell
     'AREG', 'CPA3', 'HPGDS', 'MS4A2', 'P2RX1', 'PTGS1',
-    # Monocyte classical
+    # Monocyte classical (no unique markers for non-classical in the given gene list, left blank)
     'CD14', 'CSF1', 'CSF1R', 'FCGR3A', 'ITGAM', 'LILRA5', 'LILRB2', 'C1QB', 'CLEC12A',
-
-    # Monocyte non-classical
-    # (no unique markers in the given gene list, left blank)
-
     # Neutrophils (includes NAN and TAN pooled)
-    'S100A9',
+    'S100A9', 'SELL', 
     # NK cell (includes T cell NK-like)
     'CST7', 'CD247', 'IQGAP2', 'KLRD1', 'KLRK1', 'NKG7', 'RUNX3', 'SAMD3', 'SMAD3', 'UBE2C',
     # pDC
@@ -125,23 +125,34 @@ markers = [
     'AKT1', 'ANPEP', 'CFC1', 'CEACAM8', 'CD47', 'CD274', 'EGFR', 'KRAS', 'RNF43', 'SOX9', 'CXCL2'
 ]
 
-
+print('Plotting dotplot...')
 sc.pl.dotplot(adata_combined, markers, groupby = args.phen_level)
-plt.savefig(args.output_plot + '/dotplots/dotplot_celltype.svg',format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(args.output_plot + '/dotplots/dotplot.svg', format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
-#for marker in markers:
-#    if marker in adata_combined.var_names:
-#        sc.pl.umap(adata_combined, color=marker, show = False, size=5, layer='raw_counts')
-#        plt.savefig(args.output_plot + '/umaps/rUMAP_' + marker + '.png', bbox_inches='tight')
-#        plt.close()
-#        sc.pl.umap(adata_combined, color=marker, show = False, size=5)
-#        plt.savefig(args.output_plot + '/umaps/nUMAP_' + marker + '.png', bbox_inches='tight')
-#        plt.close()
-#    else:
-#        print(f'{marker} is NOT in adata')
+print('Plotting umaps...')
+for marker in markers:
+   if marker in adata_combined.var_names:
+       sc.pl.umap(adata_combined, color=marker, show = False, size=5, layer='raw_counts')
+       plt.savefig(args.output_plot + '/umaps/rUMAP_' + marker + '.png', bbox_inches='tight')
+       plt.close()
+       sc.pl.umap(adata_combined, color=marker, show = False, size=5)
+       plt.savefig(args.output_plot + '/umaps/nUMAP_' + marker + '.png', bbox_inches='tight')
+       plt.close()
+   else:
+       print(f'{marker} is NOT in adata')
 
-# # Plot selected markers as violin plots
+print('Plotting raw violinplot...')
+sc.pl.stacked_violin(adata_combined, markers, groupby=args.phen_level, show = False, layer='raw_counts', swap_axes=True)
+plt.savefig(args.output_plot + '/violinplots/rviolin.png', bbox_inches='tight')
+plt.close()
+
+print('Plotting violinplot...')
+sc.pl.stacked_violin(adata_combined, markers, groupby=args.phen_level, show = False, swap_axes=True)
+plt.savefig(args.output_plot + '/violinplots/logn_violin.png', bbox_inches='tight')
+plt.close()
+
+# # Plot selected markers (commented out because all present in the previous dotplot)
 # #-------------------------------------------------------------------------------
 # markers = ['CD19','CD79A','MS4A1', 'BANK1', # B cells
 #            'PLVAP','RGS5', # Endothelial
@@ -162,22 +173,22 @@ plt.close()
 #            ]
 
 # print('Plotting dotplot...')
-# sc.pl.dotplot(adata_combined, markers, groupby = 'celltype')
-# plt.savefig(args.output_plot + '/dotplots/selected_dotplot_celltype.png', dpi=300, bbox_inches='tight')
+# sc.pl.dotplot(adata_combined, markers, groupby = args.phen_level)
+# plt.savefig(args.output_plot + '/dotplots/dotplot_selected_markers.png', dpi=300, bbox_inches='tight')
 # plt.close()
 
 # print('Plotting raw violinplot...')
-# sc.pl.stacked_violin(adata_combined, markers, groupby='celltype', show = False, layer='raw_counts', swap_axes=True)
-# plt.savefig(args.output_plot + '/violinplots/raw_selected_violin_celltype.png', bbox_inches='tight')
+# sc.pl.stacked_violin(adata_combined, markers, groupby=args.phen_level, show = False, layer='raw_counts', swap_axes=True)
+# plt.savefig(args.output_plot + '/violinplots/rviolin_selected_markers.png', bbox_inches='tight')
 # plt.close()
 
 # print('Plotting nlog1p violinplot...')
-# sc.pl.stacked_violin(adata_combined, markers, groupby='celltype', show = False, swap_axes=True)
-# plt.savefig(args.output_plot + '/violinplots/nlog1p_selected_violin_celltype.png', bbox_inches='tight')
+# sc.pl.stacked_violin(adata_combined, markers, groupby=args.phen_level, show = False, swap_axes=True)
+# plt.savefig(args.output_plot + '/violinplots/nviolin_selected_selected_markers.png', bbox_inches='tight')
 # plt.close()
 
 
-# Plot subselected markers
+# Plot selected markers (for final plot)
 #-------------------------------------------------------------------------------
 markers = [
     'MS4A1','TNFRSF13C', # B cell
@@ -201,17 +212,17 @@ markers = [
 
 print('Plotting dotplot...')
 sc.pl.dotplot(adata_combined, markers, groupby = args.phen_level)
-plt.savefig(args.output_plot + '/dotplots/subselected_dotplot_celltype.svg',format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(args.output_plot + '/dotplots/dotplot_selected_markers.svg',format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 print('Plotting raw violinplot...')
 sc.pl.stacked_violin(adata_combined, markers, groupby=args.phen_level, show = False, layer='raw_counts', swap_axes=True)
-plt.savefig(args.output_plot + '/violinplots/raw_subselected_violin_celltype.svg', format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(args.output_plot + '/violinplots/rviolin_selected_markers.svg', format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 print('Plotting nlog1p violinplot...')
 sc.pl.stacked_violin(adata_combined, markers, groupby=args.phen_level, show = False, swap_axes=True)
-plt.savefig(args.output_plot + '/violinplots/nlog1p_subselected_violin_celltype.svg', format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(args.output_plot + '/violinplots/logn_violin_selected_markers.svg', format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 
@@ -223,13 +234,14 @@ non_immune_cells = [
     "Club",
     "Endothelial cell",
     "Epithelial cell",
+    "Fibroblast",
     "Stromal",
     "transitional club/AT2",
     "Tumor cells",
     "other"
 ]
 
-# Plot subselected markers
+# Plot selected markers only relevant for immune cells
 #-------------------------------------------------------------------------------
 markers = [
     'MS4A1','TNFRSF13C', # B cell
@@ -253,17 +265,17 @@ markers = [
 adata_sub = adata_combined[~adata_combined.obs[args.phen_level].isin(non_immune_cells)].copy()
 print('Plotting dotplot...')
 sc.pl.dotplot(adata_sub, markers, groupby = args.phen_level)
-plt.savefig(args.output_plot + '/dotplots/subselected_dotplot_subcelltype.svg', format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(args.output_plot + '/dotplots/dotplot_selected_markers_immune.svg', format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 print('Plotting raw violinplot...')
 sc.pl.stacked_violin(adata_sub, markers, groupby=args.phen_level, show = False, layer='raw_counts')
-plt.savefig(args.output_plot + '/violinplots/raw_subselected_violin_subcelltype_notswaped.svg', format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(args.output_plot + '/violinplots/rviolin_selected_markers_immune.svg', format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 print('Plotting nlog1p violinplot...')
 sc.pl.stacked_violin(adata_sub, markers, groupby=args.phen_level, show = False)
-plt.savefig(args.output_plot + '/violinplots/nlog1p_subselected_violin_subcelltype_notswaped.svg', format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(args.output_plot + '/violinplots/logn_violin_selected_markers_immune.svg', format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 

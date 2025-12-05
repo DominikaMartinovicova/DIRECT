@@ -17,7 +17,7 @@
 #
 # Usage:
 """
-        python3 scripts/python/preprocess_Xenium.py \
+        python3 scripts/preprocessing/preprocess_Xenium.py \
         -i {input.compressed_Xenium} \
         --input_coords {input.coordinates} \
         --input_meta {input.metadata} \
@@ -49,7 +49,7 @@ def parse_args():
     "Parse inputs from commandline and returns them as a Namespace object."
     parser = argparse.ArgumentParser(prog = 'python3 preprocess_Xenium.py',
         formatter_class = argparse.RawTextHelpFormatter, description =
-        '  Create celltype specific signature matrices  ')
+        '  Filter cells and genes based on QC metrics.  ')
     parser.add_argument('-i', help='path to compressed Xenium metadata file',
                         dest='input',
                         type=str)

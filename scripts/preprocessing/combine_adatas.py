@@ -21,7 +21,7 @@
 #
 # Usage:
 """
-        python3 scripts/python/combine_adatas.py \
+        python3 scripts/preprocessing/combine_adatas.py \
         -i {input.complete_Xenium} \
 	    --input_dir {params.in_dir} \
         -o {output.combined_adatas} \
@@ -47,7 +47,7 @@ def parse_args():
     "Parse inputs from commandline and returns them as a Namespace object."
     parser = argparse.ArgumentParser(prog = 'python3 combine_adatas.py',
         formatter_class = argparse.RawTextHelpFormatter, description =
-        '  Create celltype specific signature matrices  ')
+        '  # Combine raw counts adata from all the slides to one dataset and preprocess together to further check phenotyping and perform downstream analysis.  ')
     parser.add_argument('-i', help='path to phenotyped Xenium dirs metadata file',
                         dest='input',
                         type=str)
@@ -72,7 +72,6 @@ os.makedirs(args.output_plot, exist_ok=True)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Read data
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 # From input directory read all zarr files and combine them into one adata
 #--------------------------------------------------------------------------------
 input_dir = args.input_dir

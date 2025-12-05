@@ -23,7 +23,7 @@
 #
 # Usage:
 """
-        python3 scripts/python/Run_tacco.py \
+        python3 scripts/preprocessing/Run_tacco.py \
         -i {input.preprocessed_Xenium} \
         --input_atlas {input.scRNAseq_atlas} \
         --input_dir {params.in_dir} \
@@ -57,7 +57,7 @@ def parse_args():
     "Parse inputs from commandline and returns them as a Namespace object."
     parser = argparse.ArgumentParser(prog = 'python3 Run_tacco.py',
         formatter_class = argparse.RawTextHelpFormatter, description =
-        '  Create celltype specific signature matrices  ')
+        '  Run tacco to transfer the cell labels from reference scRNA atlas. Preprocess datasets individually for potential inspection  ')
     parser.add_argument('-i', help='path to preprocessed Xenium dirs metadata file',
                         dest='input',
                         type=str)
@@ -136,12 +136,14 @@ sc.pl.paga(adata)
            
 print("Calculating UMAP...")
 sc.tl.umap(adata, init_pos = 'paga')
+sc.pl.umap(adata, color=args.phen_level, show = False, size=5)
+plt.savefig(args.output_dir_plot + f'/umap_{args.phen_level}.png', dpi=300, bbox_inches='tight')
+
 
 # Plot scatter with cell labels
 #-------------------------------------------------------------------------------
 sq.pl.spatial_scatter(adata,library_id="spatial",shape=None,color=args.phen_level,size = 1)
-output_file = args.output_dir_plot + f'/spatial_{args.phen_level}.png'
-plt.savefig(output_file, dpi=300, bbox_inches='tight')
+plt.savefig(args.output_dir_plot + f'/spatial_{args.phen_level}.png', dpi=300, bbox_inches='tight')
 plt.close()
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
