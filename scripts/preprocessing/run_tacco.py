@@ -32,6 +32,7 @@ from scipy.sparse import csr_matrix
 import argparse
 import os
 
+# Return indices of elements in l1 that are not in l2
 def non_matched_index(l1, l2):
     l2 = set(l2)
     return [i for i, el in enumerate(l1) if el not in l2]
@@ -94,7 +95,7 @@ tc.tl.annotate(adata, adata_atlas, annotation_key=args.phen_level, result_key='c
 adata.obs[args.phen_level] = adata.obsm['celltype_major'].idxmax(axis=1)
 adata.obs[args.phen_level] = adata.obs[args.phen_level].astype('category')
 
-## Remove cells with no assigned cell type by tacco
+# Remove cells with no assigned cell type by tacco
 NAN_ct_id = adata.obs.loc[adata.obs[args.phen_level].isna(),:].cell_id.to_list()
 adata = adata[non_matched_index(adata.obs.cell_id.to_list(), list(NAN_ct_id)),:]
 print(f"Nan celltypes removed from {args.input_dir}: ", len(NAN_ct_id))
@@ -114,7 +115,7 @@ sc.pp.log1p(adata)
 #-------------------------------------------------------------------------------
 print("PCA...")
 sc.pp.pca(adata)
-sc.pp.neighbors(adata)
+sc.pp.neighbors(adata, n_neighbors=16)
 
 print("PAGA...")
 sc.tl.paga(adata, groups = args.phen_level)

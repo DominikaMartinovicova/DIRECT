@@ -2,7 +2,7 @@
 #+++++++++++++++++++++++++++++++++++++++ 0 PREPARE WILDCARDS AND TARGET ++++++++++++++++++++++++++++++++++++++++++++
 # 0.1 Prepare wildcards and variables
 data_dir = 'data/'
-log_dir = 'logs/'
+log_dir = 'logs/preprocessing/'
 TMA = ['slide_3', 'slide_4', 'slide_5', 'slide_6']
 Njob = 4
 phenotyping_level = ['Salcher_celltypes', 'Neutro_Epi_extImm']

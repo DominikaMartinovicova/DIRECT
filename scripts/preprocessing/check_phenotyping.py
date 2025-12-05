@@ -6,7 +6,7 @@
 #
 #
 #
-# Adapted by: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
+# Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
 #
 # Usage:
 """

@@ -3,10 +3,21 @@
 # combine_adatas.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
+# Combine raw counts adata from all the slides to one dataset and preprocess together
+# to further check phenotyping and perform downstream analysis.
 #
+#   0 Import libraries and parse arguments
+#   1 Read data and check if raw layers contain raw counts (integers)
+#   2 Preprocessing
+#       a. Normalization
+#       b. PCA
+#       c. kNN
+#       d. PAGA
+#       e. UMAP
+#       f. Leiden clustering
+#   3 Save
 #
-#
-# Adapted by: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
+# Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
 #
 # Usage:
 """
@@ -108,15 +119,16 @@ plt.close()
 print("Neighbors...")
 sc.pp.neighbors(adata_combined)
 
-# print("PAGA...")
-# sc.tl.paga(adata_combined, groups = 'celltype')
-# sc.pl.paga(adata_combined)
+print("PAGA...")
+sc.tl.paga(adata_combined, groups = 'celltype')
+sc.pl.paga(adata_combined)
+plt.savefig(args.output_plot + "/PAGA_combined_adatas.svg", format='svg')
 
 print("Calculating UMAP...")
 sc.tl.umap(adata_combined)
 
-# print("Leiden clustering...")
-# sc.tl.leiden(adata_combined)
+print("Leiden clustering...")
+sc.tl.leiden(adata_combined)
 
 print(adata_combined.X.toarray()[0:5,0:5])
 print(adata_combined.layers['raw_counts'].toarray()[0:5,0:5])
