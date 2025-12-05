@@ -106,7 +106,9 @@ rule Tacco:
 # 1.4 Combine adatas from all TMAs into one adata
 rule combine_adatas:
     input:
-        phenotyped_Xenium = expand(data_dir + "phenotyped/{phenotyping_level}/{TMA}.zarr/zmetadata", TMA = TMA, phenotyping_level = phenotyping_level)
+     #   phenotyped_Xenium = expand(data_dir + "phenotyped/{phenotyping_level}/{TMA}.zarr/zmetadata", TMA = TMA, phenotyping_level = phenotyping_level)
+        phenotyped_Xenium = lambda wildcards: [f"{data_dir}phenotyped/{wildcards.phenotyping_level}/{t}.zarr/zmetadata" for t in TMA]
+
     output:
         combined_adatas = data_dir + "combined/{phenotyping_level}_combined_adatas.h5ad",
         output_plots = directory('plots/combined/{phenotyping_level}/')
@@ -114,7 +116,8 @@ rule combine_adatas:
     #    "envs=""
     params:
         in_dir = data_dir + "phenotyped/{phenotyping_level}/",
-        phen_level = "{phenotyping_level}"
+        #phen_level = "{phenotyping_level}"
+        phen_level = lambda wildcards: wildcards.phenotyping_level
     shell:
         """
         python3 scripts/preprocessing/combine_adatas.py \

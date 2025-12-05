@@ -22,8 +22,8 @@
 # Usage:
 """
         python3 scripts/preprocessing/combine_adatas.py \
-        -i {input.complete_Xenium} \
 	    --input_dir {params.in_dir} \
+        --phen_level {params.phen_level} \
         -o {output.combined_adatas} \
         --output_plot {params.out_plot_dir}
 """
@@ -95,7 +95,7 @@ print("Combined adata shape: " + str(adata_combined.shape))
 print(adata_combined.X.toarray()[0:5,0:5])
 adata_combined = adata_combined[~adata_combined.obs['sample'].isna(), :]
 print("Combined adata shape after removing cells not in any sample: " + str(adata_combined.shape))
-
+print(adata_combined)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Preprocessing
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

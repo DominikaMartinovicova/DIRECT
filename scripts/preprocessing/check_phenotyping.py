@@ -78,7 +78,7 @@ adata_combined= sc.read_h5ad(args.input)
 # Plot UMAP with celltypes and clinical labels
 #-------------------------------------------------------------------------------
 print('Plotting...')
-colors = [args.phen_level, 'slide','sample_type', 'pt_id']
+colors = [args.phen_level, 'slide', 'sample_type', 'pt_id', 'structure']
 
 for color in colors:
     sc.pl.umap(adata_combined, color=color, show = False, size=5, layer='raw_counts')

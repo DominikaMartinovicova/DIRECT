@@ -3,6 +3,16 @@
 # cell_fraction_analysis.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
+#   Analyze shifts in cell fractions before and after treatment. Possibly split  
+#   patients into groups based on chosen category.
+#
+#   0 Import libraries and parse arguments
+#   1 Read data
+#   2 Calculate fraction
+#   3 Save
+#
+#
+#
 #
 # Author: Mischa Steketee (m.f.b.steketee@amsterdamumc.nl)
 # Adapted by: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
@@ -10,13 +20,11 @@
 # Usage:
 #        """
 #        """
-#
-# TODO:
-# 1) 
+
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# 0.1  Import Libraries
-#--------------------------------------------------------------------------------
+# 0 Import libraries
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 import spatialdata as sd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -30,28 +38,30 @@ import math
 import anndata as ad
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# 1.1  read  data
-#--------------------------------------------------------------------------------
-#sdata = sd.read_zarr('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/complete/slide_3.zarr')
-
-## subset sdata on adata
+# 1 Read  data
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Read adata
 adata = sc.read_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/combined_adatas.h5ad')
+celltype = 'Neutro_Epi_extImm'
 
+# Create missing directories
 output_plot_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/celltype_fractions/'
 os.makedirs(output_plot_dir + 'boxplots/', exist_ok=True)
 os.makedirs(output_plot_dir + 'swarmplots/', exist_ok=True)
 os.makedirs(output_plot_dir + 'lineplots/', exist_ok=True)
 
+# Set aesthetics
 sns.set_style("whitegrid")
-sns.color_palette("Paired")
-#-------------------------------------------------------------------------------
-# 3.1 Calculate fractions per t-number
-#-------------------------------------------------------------------------------
+sns.color_palette("Tab20")
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 2 Calculate fractions
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 for element in adata.obs['T_number'].unique().dropna():
     print('Processing T_number: ' + element)
     adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
     # Calculate fractions per samples
-    temp_fractions = adata_temp.obs.celltype.value_counts()/np.sum(adata_temp.obs.celltype.value_counts())
+    temp_fractions = adata_temp.obs[celltype].value_counts()/np.sum(adata_temp.obs[celltype].value_counts())
     total_cells_temp = adata_temp.shape[0]
     
     ## save total # of cells
