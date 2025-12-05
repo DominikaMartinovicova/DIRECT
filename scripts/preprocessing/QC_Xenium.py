@@ -13,10 +13,9 @@
 #   5 Check QC after filtering
 #   6 Save the filtered data
 #
+# Author: Dominika Martinovicova (d.martiovicova@amsterdamumc.nl)
 #
-# Author: Mischa Steketee (m.f.b.steketee@amsterdamumc.nl)
-# Adapted by: Dominika Martinovicova (d.martiovicova@amsterdamumc.nl)
-#
+# Usage:
 """
         python3 scripts/python/preprocess_Xenium.py \
         -i {input.compressed_Xenium} \

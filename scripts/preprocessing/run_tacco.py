@@ -3,6 +3,19 @@
 # Run_tacco.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
+#   Run tacco to transfer the cell labels from reference scRNA atlas. Preprocess
+#   datasets individually for potential inspection.
+#
+#   0 Import libraries and parse arguments
+#   1 Read data
+#   2 Run tacco
+#   3 Dimensionality reduction
+#       a. Normalization
+#       b. PCA
+#       c. kNN
+#       d. PAGA
+#       e. UMAP
+#   4 Save
 #
 # Author: Mischa Steketee (m.f.b.steketee@amsterdamumc.nl)
 #
