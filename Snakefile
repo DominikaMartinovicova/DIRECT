@@ -114,10 +114,12 @@ rule combine_adatas:
     #    "envs=""
     params:
         in_dir = data_dir + "phenotyped/{phenotyping_level}/",
+        phen_level = "{phenotyping_level}"
     shell:
         """
         python3 scripts/preprocessing/combine_adatas.py \
 	    --input_dir {params.in_dir} \
+        --phen_level {params.phen_level} \
         -o {output.combined_adatas} \
         --output_plot {output.output_plots}
         """
@@ -142,8 +144,16 @@ rule check_phenotyping:
         --output_plot {params.out_plot_dir}
         """
 
-        
-#++++++++++++++++++++++++++++++++++++++++++ 2 Downstream analysis +++++++++++++++++++++++++++++++++++++++++	
 
+#++++++++++++++++++++++++++++++++++++++++++ 2 Downstream analysis +++++++++++++++++++++++++++++++++++++++++	
+# 2.1 Analyze cell fraction changes
+
+
+
+# 2.2 Analyze spatial proximity of cell types
+
+
+
+# 2.3 Analyze ... 
 
 

@@ -54,9 +54,8 @@ def parse_args():
     parser.add_argument('--input_dir', help='path to phenotyped Xenium dir',
                         dest='input_dir',
                         type=str)
-    parser.add_argument('-threads', help='n threads to use',
-                        dest='threads',
-                        type=int)
+    parser.add_argument('--phen_level', help='phenotyping level',
+                        dest='phen_level')
     parser.add_argument('-o', help='path to output combined xenium dirs metadata file',
                         dest='output',
                         type=str)
@@ -119,7 +118,7 @@ print("Neighbors...")
 sc.pp.neighbors(adata_combined)
 
 print("PAGA...")
-sc.tl.paga(adata_combined, groups = 'celltype')
+sc.tl.paga(adata_combined, groups = args.phen_level)
 sc.pl.paga(adata_combined)
 plt.savefig(args.output_plot + "/PAGA_combined_adatas.svg", format='svg')
 
