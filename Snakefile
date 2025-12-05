@@ -141,6 +141,8 @@ rule check_phenotyping:
         -o {output.checked_adatas} \
         --output_plot {params.out_plot_dir}
         """
+
+        
 #++++++++++++++++++++++++++++++++++++++++++ 2 Downstream analysis +++++++++++++++++++++++++++++++++++++++++	
 
 
