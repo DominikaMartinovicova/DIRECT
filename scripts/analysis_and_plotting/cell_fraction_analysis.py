@@ -104,7 +104,7 @@ def celltype_fraction_shifts(df, category, output_dir):
         
         # Plot stripplot with lines connecting paired samples
         plt.figure(figsize=(12, 6))
-        ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=7, alpha=0.7, palette='tab20')
+        ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=7, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
 
         # Prepare the data for line plotting
         wide = df_melted.pivot_table(index='pt_id', columns=['variable', 'sample_type'], values='value')
@@ -135,7 +135,7 @@ def celltype_fraction_shifts(df, category, output_dir):
         plt.xlabel("Cell Type")
         plt.ylabel("Fraction")
         plt.title("Cell Type Fractions in Biopsy vs Resection (per sample)")
-        plt.legend()
+        plt.legend(title='Sample Type')
         plt.tight_layout()
         plt.savefig(f'{output_dir}/celltype_fraction_shifts.svg', format='svg')
 
