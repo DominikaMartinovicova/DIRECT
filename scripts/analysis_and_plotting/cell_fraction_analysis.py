@@ -41,7 +41,8 @@ import anndata as ad
 # 1 Read  data
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Read adata
-adata = sc.read_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/combined_adatas.h5ad')
+print('Reading data...')
+adata = sc.read_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/Neutro_Epi_extImm_combined_adatas.h5ad')
 celltype_key = 'Neutro_Epi_extImm'
 category = 'structure' # e.g., structure, treatment, response
 
@@ -53,48 +54,36 @@ output_plot_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysi
 
 # Set aesthetics
 sns.set_style("whitegrid")
-sns.color_palette("Tab20")
+sns.color_palette("tab20")
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Calculate fractions
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 fractions_df = pd.DataFrame()
-for element in adata.obs['T_number'].unique().dropna():
-    print('Processing T_number: ' + element)
+for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
+    print(f'Processing {i}. T_number: {element}')
     adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
     total_cells_temp = adata_temp.shape[0] # Total number of cells for this T_number
     temp_fractions = adata_temp.obs[celltype_key].value_counts()/total_cells_temp # Calculate fractions
+    fractions_df = pd.concat([fractions_df, temp_fractions.rename(element)], axis=1) # Save fractions to df
 
-
-    for celltype in temp_fractions.index.to_list():
-        adata_temp.obs[celltype + '_fraction'] = temp_fractions[celltype]
-
-    # save fractions to df
-    fractions_df = pd.concat([fractions_df, temp_fractions], axis=1)
+    # Add metadata to the fractions_df
+    for meta in ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme']: #'structure',
+        fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
     
-    # add to adata_patient
-    if 'adata_sample' in locals():
-        adata_sample = ad.concat([adata_sample, adata_temp], join = 'outer')
-    else:
-        adata_sample = adata_temp
+fractions_df = fractions_df.T.fillna(0) # Transpose for easier plotting and fill NaNs with 0
+print(fractions_df.head())
 
-
-    # add metadata
-    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme'] #'structure', 
-
-
-    
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
-def celltype_fraction_shifts(adata, fraction_columns, category, output_dir):
+#def celltype_fraction_shifts(adata, fraction_columns, category, output_dir):
 
 
 
 
 
 # 2. Swarmplots of fractions per chosen category (e.g., structure) with paired pts connected
-plot_swarmplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
+#plot_swarmplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
 # 3. Lineplots of fractions per chosen category (e.g., structure) with paired pts connected
-plot_lineplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
+#plot_lineplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
