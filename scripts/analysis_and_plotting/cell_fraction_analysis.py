@@ -47,7 +47,7 @@ celltype_key = 'Neutro_Epi_extImm'
 category = 'structure' # e.g., structure, treatment, response
 
 # Create missing directories
-output_plot_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/celltype_fraction/'
+output_plot_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/'
 os.makedirs(output_plot_dir, exist_ok=True)
 #os.makedirs(output_plot_dir + 'boxplots/', exist_ok=True)
 #os.makedirs(output_plot_dir + 'swarmplots/', exist_ok=True)
@@ -92,7 +92,7 @@ print(paired_fractions_df)
 # Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
-def celltype_fraction_shifts(df, category, output_dir):
+def celltype_fraction_shifts(df, category, output_dir, stat_test = False):
     # Split data into pre- and post-treatment
     #biopsy_df = df[df['sample_type']=='biopsy']
     #resection_df = df[df['sample_type']=='resection']
@@ -130,37 +130,117 @@ def celltype_fraction_shifts(df, category, output_dir):
                 color = 'blue' if y_res > y_bio else 'red'
                 ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
 
+        if stat_test==True:
+            stat_df = stat_testing(df, cell_fraction_cols, output_dir)
+            # Add asterisks to plot based on stat test results
+            for i, celltype in enumerate(cell_fraction_cols):
+                p_value = stat_df.loc[stat_df['cell_type'] == celltype.replace(' fraction',''), 'p_value'].values[0]
+                if p_value < 0.001:
+                    ax.text(i, df_melted['value'].max() + 0.05, '***', ha='center', va='bottom', color='black')
+                elif p_value < 0.01:
+                    ax.text(i, df_melted['value'].max() + 0.05, '**', ha='center', va='bottom', color='black')
+                elif p_value < 0.05:
+                    ax.text(i, df_melted['value'].max() + 0.05, '*', ha='center', va='bottom', color='black')
+
 
         plt.xticks(rotation=45, ha='right')
         plt.xlabel("Cell Type")
         plt.ylabel("Fraction")
-        plt.title("Cell Type Fractions in Biopsy vs Resection (per sample)")
+        plt.title("Cell Type Fractions in Biopsy vs Resection")
         plt.legend(title='Sample Type')
         plt.tight_layout()
-        plt.savefig(f'{output_dir}/celltype_fraction_shifts.svg', format='svg')
+        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg')
 
 
 
-#def celltype_fraction_shifts_immune(df, category, output_dir):
+
+def celltype_fraction_shifts_immune(df, category, output_dir, stat_test = False):
     # Focus on immune cell types only
-    immune_cell_types = [col for col in df.columns if col.endswith('fraction') and col not in ['Tuft cells fraction', 'Pericytes fraction', 'Epithelial cells fraction']]
+    cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
+    non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
+    cell_fraction_cols = [col for col in cell_fraction_cols if col not in non_immune]
+    
+    # Recalculate fraction
+    df_immune = df[['pt_id', 'sample_type'] + cell_fraction_cols].copy()
+    df_immune[cell_fraction_cols] = df_immune[cell_fraction_cols].div(df_immune[cell_fraction_cols].sum(axis=1), axis=0)
+    df = df_immune
+
     if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
-        df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type'], value_vars=immune_cell_types)
+        df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type'], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
-        print(df_melted)
+        
+        # Plot stripplot with lines connecting paired samples
         plt.figure(figsize=(12, 6))
-        sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=5, alpha=0.7, palette='tab20')
+        ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=7, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
+
+        # Prepare the data for line plotting
+        wide = df_melted.pivot_table(index='pt_id', columns=['variable', 'sample_type'], values='value')
+        print(wide)
+
+        # x positions of categorical axis
+        categories = df_melted['variable'].unique()
+        xticks = ax.get_xticks()
+        x_map = dict(zip(categories, xticks))
+
+        # offset for biopsy vs resection points
+        offset = 0.18
+
+        # Draw lines connecting paired samples
+        for celltype in categories:
+            sub = wide[celltype].dropna()
+            for _, row in sub.iterrows():
+                x_left = x_map[celltype] - offset   # biopsy x-position
+                x_right = x_map[celltype] + offset  # resection x-position
+                y_bio = row['Biopsy']
+                y_res = row['Resection']
+
+                color = 'blue' if y_res > y_bio else 'red'
+                ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
+
+        if stat_test==True:
+            stat_df = stat_testing(df, cell_fraction_cols, output_dir)
+            # Add asterisks to plot based on stat test results
+            for i, celltype in enumerate(cell_fraction_cols):
+                p_value = stat_df.loc[stat_df['cell_type'] == celltype.replace(' fraction',''), 'p_value'].values[0]
+                if p_value < 0.001:
+                    print('1')
+                    ax.text(i, df_melted['value'].max() + 0.05, '***', ha='center', va='bottom', color='black')
+                elif p_value < 0.01:
+                    print('2')
+                    ax.text(i, df_melted['value'].max() + 0.05, '**', ha='center', va='bottom', color='black')
+                elif p_value < 0.05:
+                    print('3')
+                    ax.text(i, df_melted['value'].max() + 0.05, '*', ha='center', va='bottom', color='black')
+
         plt.xticks(rotation=45, ha='right')
-        plt.xlabel("Immune Cell Type")
+        plt.xlabel("Cell Type")
         plt.ylabel("Fraction")
-        plt.title("Immune Cell Type Fractions in Biopsy vs Resection (per sample)")
-        plt.legend()
+        plt.title("Cell Type Fractions in Biopsy vs Resection (Immune)")
+        plt.legend(title='Sample Type')
         plt.tight_layout()
-        plt.savefig(f'{output_dir}/immune_celltype_fraction_shifts.svg', format='svg')
+        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
 
 
-celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir)
-#celltype_fraction_shifts_immune(paired_fractions_df, None, output_plot_dir)
+def stat_testing(df, cell_fraction_cols, output_dir):
+    from scipy.stats import wilcoxon
+    # Perform statistical test for each cell type
+    stat_results = []
+    for celltype in cell_fraction_cols:
+        biopsy_values = df[df['sample_type']=='Biopsy'][celltype]
+        resection_values = df[df['sample_type']=='Resection'][celltype]
+        # Ensure paired samples
+        stat, p_value = wilcoxon(biopsy_values, resection_values)
+        stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
+
+    stat_df = pd.DataFrame(stat_results)
+    stat_df.to_csv(f'{output_dir}/results/analysis/celltype_fraction/celltype_fraction_statistical_results.csv', index=False)
+    print(stat_df)
+    return stat_df
+
+
+
+celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir, True)
+celltype_fraction_shifts_immune(paired_fractions_df, None, output_plot_dir, False)
 # 2. Swarmplots of fractions per chosen category (e.g., structure) with paired pts connected
 #plot_swarmplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
 # 3. Lineplots of fractions per chosen category (e.g., structure) with paired pts connected
