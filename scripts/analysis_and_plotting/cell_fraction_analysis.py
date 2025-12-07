@@ -48,6 +48,7 @@ category = 'structure' # e.g., structure, treatment, response
 
 # Create missing directories
 output_plot_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/celltype_fraction/'
+os.makedirs(output_plot_dir, exist_ok=True)
 #os.makedirs(output_plot_dir + 'boxplots/', exist_ok=True)
 #os.makedirs(output_plot_dir + 'swarmplots/', exist_ok=True)
 #os.makedirs(output_plot_dir + 'lineplots/', exist_ok=True)
@@ -81,7 +82,16 @@ fractions_df['treatment'] = np.where(fractions_df['treatment_scheme'] == 'v1.7',
 print(fractions_df.head())
 
 # Keep only patients with matched biopsy and resection samples
-paired_pts = fractions_df['pt_id'][fractions_df['sample_type']=='biopsy'].isin(fractions_df['pt_id'][fractions_df['sample_type']=='resection'])
+#print(fractions_df['pt_id'])
+#print(fractions_df[fractions_df['sample_type']=='Resection']['pt_id'])
+resection_pts = fractions_df[fractions_df['sample_type']=='Resection']['pt_id']
+biopsy_pts = fractions_df[fractions_df['sample_type']=='Biopsy']['pt_id']
+print('resection pts:')
+print(resection_pts)
+print('biopsy pts:')
+print(biopsy_pts)
+paired_pts = resection_pts[resection_pts.isin(biopsy_pts)]
+print(paired_pts)
 paired_fractions_df = fractions_df[fractions_df['pt_id'].isin(paired_pts.index.unique())]
 print(f'Number of paired patients: {len(paired_fractions_df["pt_id"].unique())}')
 
@@ -93,14 +103,21 @@ def celltype_fraction_shifts(df, category, output_dir):
     biopsy_df = df[df['sample_type']=='biopsy']
     resection_df = df[df['sample_type']=='resection']
     cell_fraction_keys = [col for col in df.columns if col.endswith('fraction')]
-    if category == None:
-           # Do not split into groups, compare biopsy vs resection for all patients
+    if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
+        for cell_fraction in cell_fraction_keys:
+            plt.figure(figsize=(6,6))
+            sns.boxplot(data=df.melt(id_vars=['pt_id', 'sample_type'], value_vars=[cell_fraction]), x='sample_type', y='value', palette='tab20')
+            sns.swarmplot(data=df.melt(id_vars=['pt_id', 'sample_type'], value_vars=[cell_fraction]), x='sample_type', y='value', color='black', alpha=0.7)
+            plt.title(f'Cell type fraction shifts: {cell_fraction}')
+            plt.ylabel('Fraction')
+            plt.xlabel('Sample Type')
+            plt.savefig(os.path.join(output_dir, f'{cell_fraction}_shifts_boxplot.png'))
+            plt.close()
 
 
 
 
-
-celltype_fraction_shifts(paired_fractions_df, )
+celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir)
 # 2. Swarmplots of fractions per chosen category (e.g., structure) with paired pts connected
 #plot_swarmplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
 # 3. Lineplots of fractions per chosen category (e.g., structure) with paired pts connected
