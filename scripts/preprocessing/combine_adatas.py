@@ -115,7 +115,7 @@ plt.savefig(args.output_plot + "/PCA_variance_explained.png")
 plt.close()
 
 print("Neighbors...")
-sc.pp.neighbors(adata_combined)
+sc.pp.neighbors(adata_combined, n_neighbors=16)
 
 print("PAGA...")
 sc.tl.paga(adata_combined, groups = args.phen_level)

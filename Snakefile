@@ -150,7 +150,24 @@ rule check_phenotyping:
 
 #++++++++++++++++++++++++++++++++++++++++++ 2 Downstream analysis +++++++++++++++++++++++++++++++++++++++++	
 # 2.1 Analyze cell fraction changes
-
+rule cell_fraction_analysis:
+    input:
+        combined_adatas = data_dir + "combined/{phenotyping_level}_combined_adatas.h5ad"
+    output:
+        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+    #conda:
+    #    "envs=""
+    params:
+        out_plot_dir = 'plots/analysis/celltype_fraction/{phenotyping_level}/',
+        phen_level = "{phenotyping_level}"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/cell_fraction_analysis.py \
+	    -i {input.combined_adatas} \
+        --phen_level {params.phen_level} \
+        -o {output.checked_adatas} \
+        --output_plot {params.out_plot_dir}
+        """
 
 
 # 2.2 Analyze spatial proximity of cell types
