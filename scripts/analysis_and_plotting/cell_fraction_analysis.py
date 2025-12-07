@@ -57,9 +57,9 @@ sns.set_style("whitegrid")
 sns.color_palette("tab20")
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# 2 Calculate fractions
+# 2 Create fractions dataframe
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-fractions_df = pd.DataFrame()
+fractions_df = pd.DataFrame(dtype=object)
 for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
     print(f'Processing {i}. T_number: {element}')
     adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
@@ -72,12 +72,14 @@ for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
         fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
     
 fractions_df = fractions_df.T.fillna(0) # Transpose for easier plotting and fill NaNs with 0
+fractions_df['MPR'] = np.where(fractions_df['regression']>=90, '>=90', '<90') # Create MPR column
+fractions_df['treatment'] = np.where(fractions_df['treatment_scheme'] == 'v1.7', 'aggressive', 'milder') # Create treatment column
 print(fractions_df.head())
 
 # Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
-#def celltype_fraction_shifts(adata, fraction_columns, category, output_dir):
+def celltype_fraction_shifts(adata, fraction_columns, category, output_dir):
 
 
 
