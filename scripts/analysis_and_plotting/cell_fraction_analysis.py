@@ -82,42 +82,85 @@ fractions_df['treatment'] = np.where(fractions_df['treatment_scheme'] == 'v1.7',
 print(fractions_df.head())
 
 # Keep only patients with matched biopsy and resection samples
-#print(fractions_df['pt_id'])
-#print(fractions_df[fractions_df['sample_type']=='Resection']['pt_id'])
-resection_pts = fractions_df[fractions_df['sample_type']=='Resection']['pt_id']
-biopsy_pts = fractions_df[fractions_df['sample_type']=='Biopsy']['pt_id']
-print('resection pts:')
-print(resection_pts)
-print('biopsy pts:')
-print(biopsy_pts)
-paired_pts = resection_pts[resection_pts.isin(biopsy_pts)]
-print(paired_pts)
-paired_fractions_df = fractions_df[fractions_df['pt_id'].isin(paired_pts.index.unique())]
+resection_pts = fractions_df[fractions_df['sample_type']=='Resection']['pt_id'].tolist()
+biopsy_pts = fractions_df[fractions_df['sample_type']=='Biopsy']['pt_id'].tolist()
+paired_pts = list(set(resection_pts) & set(biopsy_pts))
+paired_fractions_df = fractions_df[fractions_df['pt_id'].isin(paired_pts)]
 print(f'Number of paired patients: {len(paired_fractions_df["pt_id"].unique())}')
+print(paired_fractions_df)
 
 # Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
 def celltype_fraction_shifts(df, category, output_dir):
     # Split data into pre- and post-treatment
-    biopsy_df = df[df['sample_type']=='biopsy']
-    resection_df = df[df['sample_type']=='resection']
-    cell_fraction_keys = [col for col in df.columns if col.endswith('fraction')]
+    #biopsy_df = df[df['sample_type']=='biopsy']
+    #resection_df = df[df['sample_type']=='resection']
+    cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
+
     if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
-        for cell_fraction in cell_fraction_keys:
-            plt.figure(figsize=(6,6))
-            sns.boxplot(data=df.melt(id_vars=['pt_id', 'sample_type'], value_vars=[cell_fraction]), x='sample_type', y='value', palette='tab20')
-            sns.swarmplot(data=df.melt(id_vars=['pt_id', 'sample_type'], value_vars=[cell_fraction]), x='sample_type', y='value', color='black', alpha=0.7)
-            plt.title(f'Cell type fraction shifts: {cell_fraction}')
-            plt.ylabel('Fraction')
-            plt.xlabel('Sample Type')
-            plt.savefig(os.path.join(output_dir, f'{cell_fraction}_shifts_boxplot.png'))
-            plt.close()
+        df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type'], value_vars=cell_fraction_cols)
+        df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
+        
+        # Plot stripplot with lines connecting paired samples
+        plt.figure(figsize=(12, 6))
+        ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=7, alpha=0.7, palette='tab20')
+
+        # Prepare the data for line plotting
+        wide = df_melted.pivot_table(index='pt_id', columns=['variable', 'sample_type'], values='value')
+        print(wide)
+
+        # x positions of categorical axis
+        categories = df_melted['variable'].unique()
+        xticks = ax.get_xticks()
+        x_map = dict(zip(categories, xticks))
+
+        # offset for biopsy vs resection points
+        offset = 0.18
+
+        # Draw lines connecting paired samples
+        for celltype in categories:
+            sub = wide[celltype].dropna()
+            for _, row in sub.iterrows():
+                x_left = x_map[celltype] - offset   # biopsy x-position
+                x_right = x_map[celltype] + offset  # resection x-position
+                y_bio = row['Biopsy']
+                y_res = row['Resection']
+
+                color = 'blue' if y_res > y_bio else 'red'
+                ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
 
 
+        plt.xticks(rotation=45, ha='right')
+        plt.xlabel("Cell Type")
+        plt.ylabel("Fraction")
+        plt.title("Cell Type Fractions in Biopsy vs Resection (per sample)")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f'{output_dir}/celltype_fraction_shifts.svg', format='svg')
+
+
+
+#def celltype_fraction_shifts_immune(df, category, output_dir):
+    # Focus on immune cell types only
+    immune_cell_types = [col for col in df.columns if col.endswith('fraction') and col not in ['Tuft cells fraction', 'Pericytes fraction', 'Epithelial cells fraction']]
+    if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
+        df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type'], value_vars=immune_cell_types)
+        df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
+        print(df_melted)
+        plt.figure(figsize=(12, 6))
+        sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=5, alpha=0.7, palette='tab20')
+        plt.xticks(rotation=45, ha='right')
+        plt.xlabel("Immune Cell Type")
+        plt.ylabel("Fraction")
+        plt.title("Immune Cell Type Fractions in Biopsy vs Resection (per sample)")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f'{output_dir}/immune_celltype_fraction_shifts.svg', format='svg')
 
 
 celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir)
+#celltype_fraction_shifts_immune(paired_fractions_df, None, output_plot_dir)
 # 2. Swarmplots of fractions per chosen category (e.g., structure) with paired pts connected
 #plot_swarmplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
 # 3. Lineplots of fractions per chosen category (e.g., structure) with paired pts connected
