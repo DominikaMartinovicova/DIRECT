@@ -96,7 +96,7 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
         
         # Plot stripplot with lines connecting paired samples
-        plt.figure(figsize=(12, 6))
+        #plt.figure(figsize=(12, 6))
         ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=7, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
 
         # Prepare the data for line plotting
@@ -142,12 +142,12 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
 
     elif category != None:   # Split into groups based on chosen category
         print(df)
-        plt.figure(figsize=(14, 8))
+        #plt.figure(figsize=(18, 8))
         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
 
         # Plot stripplot with lines connecting paired samples
-        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, dodge=True, jitter=False, size=5, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
+        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, kind='strip', legend=False)
         
         # Loop over each axis to add lines
         for ax, (cat_value, subdata) in zip(g.axes.flat, df_melted.groupby(category)):
@@ -170,23 +170,25 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
                     color = 'blue' if y_res > y_bio else 'red'
                     ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
         
-        # Perform statistical testing if specified
-        if perform_stat_test==True:
-            stat_df_annot = paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test)
+            # # Perform statistical testing if specified
+            # if perform_stat_test==True:
+            #     stat_df_annot = paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test)
 
-            # Generate pairs for significant comparisons only
-            alpha = 0.05
-            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
-            print(sig_df)
-            pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
-            annot = Annotator(ax,pairs,data=df_melted,x='variable', y='value',hue='sample_type')
-            annot.configure(text_format="star")
-            annot.set_pvalues_and_annotate(sig_df['pval'])
+            #     # Generate pairs for significant comparisons only
+            #     alpha = 0.05
+            #     sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+            #     print(sig_df)
+            #     pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+            #     annot = Annotator(ax,pairs,data=df_melted,x='variable', y='value',hue='sample_type')
+            #     annot.configure(text_format="star")
+            #     annot.set_pvalues_and_annotate(sig_df['pval'])
         
-        sns.move_legend(g, "upper left", title='Sample Type', bbox_to_anchor=(1, 1))
+        #sns.move_legend(g, "upper right", title='Sample Type')
         g.set_xticklabels(rotation=45, ha='right')
         g.set_xlabels("Cell Type")
         g.set_ylabels("Fraction")
+        plt.legend(title='Sample Type', loc = 'upper right')
+        #plt.legend.set_loc('upper right')
         plt.tight_layout()
         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_immune_celltype_fraction_shifts.svg', format='svg')
 
