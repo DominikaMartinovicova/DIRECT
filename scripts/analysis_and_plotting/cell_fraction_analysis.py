@@ -87,7 +87,7 @@ print(paired_fractions_df)
 # 3 Define functions for analyses
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
-def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform_stat_test = False, immune = False):
+def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform_stat_test = False, immune = False):
     # Split data into pre- and post-treatment
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
 
@@ -98,6 +98,62 @@ def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform
         # Plot stripplot with lines connecting paired samples
         plt.figure(figsize=(12, 6))
         ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=7, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
+
+        # Prepare the data for line plotting
+        wide = df_melted.pivot_table(index='pt_id', columns=['variable', 'sample_type'], values='value')
+
+        # x positions of categorical axis
+        categories = df_melted['variable'].unique()
+        xticks = ax.get_xticks()
+        x_map = dict(zip(categories, xticks))
+        offset = 0.18 # offset for biopsy vs resection points
+
+        # Draw lines connecting paired samples
+        for celltype in categories:
+            sub = wide[celltype].dropna()
+            for _, row in sub.iterrows():
+                x_left = x_map[celltype] - offset   # biopsy x-position
+                x_right = x_map[celltype] + offset  # resection x-position
+                y_bio = row['Biopsy']
+                y_res = row['Resection']
+                color = 'blue' if y_res > y_bio else 'red'
+                ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
+        
+        # Perform statistical testing if specified
+        if perform_stat_test==True:
+            stat_df_annot = paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test)
+
+            # Generate pairs for significant comparisons only
+            alpha = 0.05
+            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+            print(sig_df)
+            pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+            annot = Annotator(ax,pairs,data=df_melted,x='variable', y='value',hue='sample_type')
+            annot.configure(text_format="star")
+            annot.set_pvalues_and_annotate(sig_df['pval'])
+        
+        plt.xticks(rotation=45, ha='right')
+        plt.xlabel("Cell Type")
+        plt.ylabel("Fraction")
+        plt.title("Cell Type Fractions in Biopsy vs Resection") if immune==False else plt.title("Immune Cell Type Fractions in Biopsy vs Resection")
+        plt.legend(title='Sample Type')
+        plt.tight_layout()
+        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
+
+
+    elif category != None:   # Split into groups based on chosen category
+        plt.figure(figsize=(12, 6))
+        df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
+        df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
+
+        # Plot stripplot with lines connecting paired samples
+        g = sns.stripplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, dodge=True, jitter=False, size=7, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
+        sns.move_legend(g, "upper left", title='Sample Type', bbox_to_anchor=(1, 1))
+        g.set_xticklabels(rotation=45, ha='right')
+        g.set_xlabels("Cell Type")
+        g.set_ylabels("Fraction")
+        plt.tight_layout()
+        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_immune_celltype_fraction_shifts.svg', format='svg')
 
         # Prepare the data for line plotting
         wide = df_melted.pivot_table(index='pt_id', columns=['variable', 'sample_type'], values='value')
@@ -119,28 +175,24 @@ def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform
                 y_res = row['Resection']
                 color = 'blue' if y_res > y_bio else 'red'
                 ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
-    elif category != None:   # Split into groups based on chosen category
-        df_melted = pd.melt(df, id_vars=['pt_id', 'sample
 
-    if perform_stat_test==True:
-        stat_df_annot = paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test)
+        if perform_stat_test==True:
+            stat_df_annot = paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test)
 
-        # Generate pairs for significant comparisons only
-        alpha = 0.05
-        sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
-        print(sig_df)
-        pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
-        annot = Annotator(ax,pairs,data=df_melted,x='variable', y='value',hue='sample_type')
-        annot.configure(text_format="star")
-        annot.set_pvalues_and_annotate(sig_df['pval'])
+            # Generate pairs for significant comparisons only
+            alpha = 0.05
+            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+            print(sig_df)
+            pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+            annot = Annotator(ax,pairs,data=df_melted,x='variable', y='value',hue='sample_type')
+            annot.configure(text_format="star")
+            annot.set_pvalues_and_annotate(sig_df['pval'])
 
-    plt.xticks(rotation=45, ha='right')
-    plt.xlabel("Cell Type")
-    plt.ylabel("Fraction")
-    plt.title("Cell Type Fractions in Biopsy vs Resection") if immune==False else plt.title("Immune Cell Type Fractions in Biopsy vs Resection")
-    plt.legend(title='Sample Type')
-    plt.tight_layout()
-    plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
+        plt.xticks(rotation=45, ha='right')
+        plt.xlabel("Cell Type")
+        plt.ylabel("Fraction")
+        plt.tight_layout()
+        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
 
 
 # Perform statistical testing
@@ -166,38 +218,39 @@ def paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test, immune=Fa
     return stat_df_annot
 
 
-def celltype_fraction_composition(df, output_dir, category=None, stat_test=None, perform_stat_test=False):
-    print(df)
-    biopsy_df = df[df['sample_type']=='Biopsy']
-    resection_df = df[df['sample_type']=='Resection']
-    cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
+
+# def celltype_fraction_composition(df, output_dir, category=None, stat_test=None, perform_stat_test=False):
+#     print(df)
+#     biopsy_df = df[df['sample_type']=='Biopsy']
+#     resection_df = df[df['sample_type']=='Resection']
+#     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
 
     
-    if category==None:
-        plt.figure(figsize=(12, 6))
-        df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type'], value_vars=cell_fraction_cols)
-        df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
-        print(df_melted)
-        sns.boxplot(data=df_melted, x="variable", y="value", hue="sample_type", palette='tab20', fill=True, gap=0.2)
-        plt.xticks(rotation=45, ha='right')
-        plt.xlabel("Cell Type")
-        plt.ylabel("Fraction")
-        plt.title("Cell Type Fractions in Biopsy and Resection") if immune==False else plt.title("Immune Cell Type Fractions in Biopsy and Resection")
-        plt.legend(title='Sample Type')
-        plt.tight_layout()
-        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_box.svg', format='svg')
+#     if category==None:
+#         plt.figure(figsize=(12, 6))
+#         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type'], value_vars=cell_fraction_cols)
+#         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
+#         print(df_melted)
+#         sns.boxplot(data=df_melted, x="variable", y="value", hue="sample_type", palette='tab20', fill=True, gap=0.2)
+#         plt.xticks(rotation=45, ha='right')
+#         plt.xlabel("Cell Type")
+#         plt.ylabel("Fraction")
+#         plt.title("Cell Type Fractions in Biopsy and Resection") if immune==False else plt.title("Immune Cell Type Fractions in Biopsy and Resection")
+#         plt.legend(title='Sample Type')
+#         plt.tight_layout()
+#         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_box.svg', format='svg')
 
-    elif category != None:
-        plt.figure(figsize=(12, 6))
-        df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
-        df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
-        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, kind='box', palette='tab20')
-        sns.move_legend(g, "upper right", title='Sample Type')
-        g.set_xticklabels(rotation=45, ha='right')
-        g.set_xlabels("Cell Type")
-        g.set_ylabels("Fraction")
-        plt.tight_layout()
-        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_celltype_fraction_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_immune_celltype_fraction_box.svg', format='svg')
+#     elif category != None:
+#         plt.figure(figsize=(12, 6))
+#         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
+#         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
+#         g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, kind='box', palette='tab20')
+#         sns.move_legend(g, "upper right", title='Sample Type')
+#         g.set_xticklabels(rotation=45, ha='right')
+#         g.set_xlabels("Cell Type")
+#         g.set_ylabels("Fraction")
+#         plt.tight_layout()
+#         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_celltype_fraction_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_immune_celltype_fraction_box.svg', format='svg')
 
 
     
@@ -208,20 +261,20 @@ def celltype_fraction_composition(df, output_dir, category=None, stat_test=None,
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#celltype_fraction_shifts(paired_fractions_df, category = None, output_dir, stat_test=wilcoxon, perform_stat_test=True)
+celltype_fraction_shifts(paired_fractions_df, output_dir, category = None, stat_test=wilcoxon, perform_stat_test=True)
 
-# if immune==True:
-#     # Focus on immune cell types only
-#     cell_fraction_cols = sorted([col for col in paired_fractions_df.columns if col.endswith('fraction')])
-#     non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
-#     cell_fraction_cols = [col for col in cell_fraction_cols if col not in non_immune]
+if immune==True:
+    # Focus on immune cell types only
+    cell_fraction_cols = sorted([col for col in paired_fractions_df.columns if col.endswith('fraction')])
+    non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
+    cell_fraction_cols = [col for col in cell_fraction_cols if col not in non_immune]
     
-#     # Recalculate fraction
-#     df_immune = paired_fractions_df[['pt_id', 'sample_type'] + cell_fraction_cols].copy()
-#     df_immune[cell_fraction_cols] = df_immune[cell_fraction_cols].div(df_immune[cell_fraction_cols].sum(axis=1), axis=0)
-#     paired_fractions_df = df_immune
-#     celltype_fraction_shifts(paired_fractions_df, None, output_dir, stat_test=wilcoxon, perform_stat_test=False, immune=True)
+    # Recalculate fraction
+    df_immune = paired_fractions_df[['pt_id', 'sample_type'] + cell_fraction_cols].copy()
+    df_immune[cell_fraction_cols] = df_immune[cell_fraction_cols].div(df_immune[cell_fraction_cols].sum(axis=1), axis=0)
+    paired_fractions_df = df_immune
+    celltype_fraction_shifts(paired_fractions_df, output_dir, category=None, stat_test=wilcoxon, perform_stat_test=False, immune=True)
 
-celltype_fraction_composition(fractions_df, category = 'MPR', output_dir=output_dir)#, stat_test = ttest_rel, perform_stat_test=False)
+#celltype_fraction_composition(fractions_df, category = 'MPR', output_dir=output_dir)#, stat_test = ttest_rel, perform_stat_test=False)
 
 
