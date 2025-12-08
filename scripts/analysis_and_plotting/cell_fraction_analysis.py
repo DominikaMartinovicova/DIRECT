@@ -36,6 +36,8 @@ import numpy as np
 import pandas as pd
 import math
 import anndata as ad
+from scipy.stats import wilcoxon
+from statannotations.Annotator import Annotator
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Read  data
@@ -92,7 +94,7 @@ print(paired_fractions_df)
 # Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
-def celltype_fraction_shifts(df, category, output_dir, stat_test = False):
+def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform_stat_test = False):
     # Split data into pre- and post-treatment
     #biopsy_df = df[df['sample_type']=='biopsy']
     #resection_df = df[df['sample_type']=='resection']
@@ -130,17 +132,17 @@ def celltype_fraction_shifts(df, category, output_dir, stat_test = False):
                 color = 'blue' if y_res > y_bio else 'red'
                 ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
 
-        if stat_test==True:
-            stat_df = stat_testing(df, cell_fraction_cols, output_dir)
-            # Add asterisks to plot based on stat test results
-            for i, celltype in enumerate(cell_fraction_cols):
-                p_value = stat_df.loc[stat_df['cell_type'] == celltype.replace(' fraction',''), 'p_value'].values[0]
-                if p_value < 0.001:
-                    ax.text(i, df_melted['value'].max() + 0.05, '***', ha='center', va='bottom', color='black')
-                elif p_value < 0.01:
-                    ax.text(i, df_melted['value'].max() + 0.05, '**', ha='center', va='bottom', color='black')
-                elif p_value < 0.05:
-                    ax.text(i, df_melted['value'].max() + 0.05, '*', ha='center', va='bottom', color='black')
+        if perform_stat_test==True:
+            stat_df_annot = stat_testing(df, cell_fraction_cols, output_dir, stat_test)
+
+            # Generate pairs for significant comparisons only
+            alpha = 0.05
+            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+            print(sig_df)
+            pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+            annot = Annotator(ax,pairs,data=df_melted,x='variable', y='value',hue='sample_type')
+            annot.configure(text_format="star")
+            annot.set_pvalues_and_annotate(sig_df['pval'])
 
 
         plt.xticks(rotation=45, ha='right')
@@ -154,7 +156,7 @@ def celltype_fraction_shifts(df, category, output_dir, stat_test = False):
 
 
 
-def celltype_fraction_shifts_immune(df, category, output_dir, stat_test = False):
+def celltype_fraction_shifts_immune(df, category, output_dir, perform_stat_test = False, stat_test = None):
     # Focus on immune cell types only
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
     non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
@@ -221,25 +223,30 @@ def celltype_fraction_shifts_immune(df, category, output_dir, stat_test = False)
         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
 
 
-def stat_testing(df, cell_fraction_cols, output_dir):
-    from scipy.stats import wilcoxon
+def stat_testing(df, cell_fraction_cols, output_dir, stat_test):
     # Perform statistical test for each cell type
     stat_results = []
     for celltype in cell_fraction_cols:
         biopsy_values = df[df['sample_type']=='Biopsy'][celltype]
         resection_values = df[df['sample_type']=='Resection'][celltype]
         # Ensure paired samples
-        stat, p_value = wilcoxon(biopsy_values, resection_values)
+        stat, p_value = stat_test(biopsy_values, resection_values)
         stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
 
     stat_df = pd.DataFrame(stat_results)
     stat_df.to_csv(f'{output_dir}/results/analysis/celltype_fraction/celltype_fraction_statistical_results.csv', index=False)
     print(stat_df)
-    return stat_df
+
+    # Prepare stat_df for Annotator (expected format to be able to draw asterisks on plot)
+    stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
+    stat_df_annot["group1"] = "Biopsy"
+    stat_df_annot["group2"] = "Resection"
+    stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected format
+    return stat_df_annot
 
 
 
-celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir, True)
+celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir, True, stat_test=wilcoxon)
 celltype_fraction_shifts_immune(paired_fractions_df, None, output_plot_dir, False)
 # 2. Swarmplots of fractions per chosen category (e.g., structure) with paired pts connected
 #plot_swarmplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
