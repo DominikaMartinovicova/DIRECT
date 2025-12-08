@@ -156,7 +156,7 @@ def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform
 
 
 
-def celltype_fraction_shifts_immune(df, category, output_dir, perform_stat_test = False, stat_test = None):
+def celltype_fraction_shifts_immune(df, category, output_dir, stat_test = None, perform_stat_test = False):
     # Focus on immune cell types only
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
     non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
@@ -199,20 +199,17 @@ def celltype_fraction_shifts_immune(df, category, output_dir, perform_stat_test 
                 color = 'blue' if y_res > y_bio else 'red'
                 ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
 
-        if stat_test==True:
-            stat_df = stat_testing(df, cell_fraction_cols, output_dir)
-            # Add asterisks to plot based on stat test results
-            for i, celltype in enumerate(cell_fraction_cols):
-                p_value = stat_df.loc[stat_df['cell_type'] == celltype.replace(' fraction',''), 'p_value'].values[0]
-                if p_value < 0.001:
-                    print('1')
-                    ax.text(i, df_melted['value'].max() + 0.05, '***', ha='center', va='bottom', color='black')
-                elif p_value < 0.01:
-                    print('2')
-                    ax.text(i, df_melted['value'].max() + 0.05, '**', ha='center', va='bottom', color='black')
-                elif p_value < 0.05:
-                    print('3')
-                    ax.text(i, df_melted['value'].max() + 0.05, '*', ha='center', va='bottom', color='black')
+        if perform_stat_test==True:
+            stat_df_annot = stat_testing(df, cell_fraction_cols, output_dir, stat_test)
+
+            # Generate pairs for significant comparisons only
+            alpha = 0.05
+            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+            print(sig_df)
+            pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+            annot = Annotator(ax,pairs,data=df_melted,x='variable', y='value',hue='sample_type')
+            annot.configure(text_format="star")
+            annot.set_pvalues_and_annotate(sig_df['pval'])
 
         plt.xticks(rotation=45, ha='right')
         plt.xlabel("Cell Type")
@@ -246,8 +243,8 @@ def stat_testing(df, cell_fraction_cols, output_dir, stat_test):
 
 
 
-celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir, True, stat_test=wilcoxon)
-celltype_fraction_shifts_immune(paired_fractions_df, None, output_plot_dir, False)
+celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir, stat_test=wilcoxon, perform_stat_test=True)
+celltype_fraction_shifts_immune(paired_fractions_df, None, output_plot_dir, perform_stat_test=False)
 # 2. Swarmplots of fractions per chosen category (e.g., structure) with paired pts connected
 #plot_swarmplot(adata_sample_paired, fraction_columns, 'structure', output_plot_dir)
 # 3. Lineplots of fractions per chosen category (e.g., structure) with paired pts connected
