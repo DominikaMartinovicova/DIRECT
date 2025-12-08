@@ -184,7 +184,7 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
                 annot.set_pvalues_and_annotate(sig_df['pval'])
         
         #sns.move_legend(g, "upper right", title='Sample Type')
-        g.set_xticklabels(rotation=90, ha='right')
+        g.set_xticklabels(rotation=45, ha='right')
         g.set_xlabels("Cell Type")
         g.set_ylabels("Fraction")
         g.legend.set_title('Sample Type')
@@ -251,16 +251,12 @@ def paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test, immune=Fa
 #         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_celltype_fraction_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_immune_celltype_fraction_box.svg', format='svg')
 
 
-    
-
-
-
-
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 categories = ['MPR', None, 'treatment']
 for category in categories:
+    print(f'Analyzing category: {category}')
     celltype_fraction_shifts(paired_fractions_df, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=False)
         # Focus on immune cell types only
     non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
@@ -268,8 +264,7 @@ for category in categories:
     print(f'Excluding non-immune cell types: {to_exclude}')
 
     df_immune = paired_fractions_df.drop(labels=to_exclude, axis=1)
-    celltype_fraction_shifts(df_immune, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=True)
-
+    celltype_fraction_shifts(df_immune, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=True)s
 
 
 #celltype_fraction_composition(fractions_df, category = 'MPR', output_dir=output_dir)#, stat_test = ttest_rel, perform_stat_test=False)
