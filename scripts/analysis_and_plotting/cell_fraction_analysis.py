@@ -147,7 +147,7 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
 
         # Plot stripplot with lines connecting paired samples
-        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, kind='strip', legend=False)
+        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, kind='strip')
         
         # Loop over each axis to add lines
         for ax, (cat_value, subdata) in zip(g.axes.flat, df_melted.groupby(category)):
@@ -184,11 +184,11 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
             #     annot.set_pvalues_and_annotate(sig_df['pval'])
         
         #sns.move_legend(g, "upper right", title='Sample Type')
-        g.set_xticklabels(rotation=45, ha='right')
+        g.set_xticklabels(rotation=90, ha='right')
         g.set_xlabels("Cell Type")
         g.set_ylabels("Fraction")
-        plt.legend(title='Sample Type', loc = 'upper right')
-        #plt.legend.set_loc('upper right')
+        g.legend.set_title('Sample Type')
+        g.legend.set_loc('upper right')
         plt.tight_layout()
         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_immune_celltype_fraction_shifts.svg', format='svg')
 
