@@ -47,11 +47,11 @@ category = 'structure' # e.g., structure, treatment, response
 immune = True  # Focus on immune cell types only
 
 # Create missing directories
-output_plot_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/'
-os.makedirs(output_plot_dir, exist_ok=True)
-#os.makedirs(output_plot_dir + 'boxplots/', exist_ok=True)
-#os.makedirs(output_plot_dir + 'swarmplots/', exist_ok=True)
-#os.makedirs(output_plot_dir + 'lineplots/', exist_ok=True)
+output_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/'
+#os.makedirs(output_dir, exist_ok=True)
+#os.makedirs(output_dir + 'boxplots/', exist_ok=True)
+#os.makedirs(output_dir + 'swarmplots/', exist_ok=True)
+#os.makedirs(output_dir + 'lineplots/', exist_ok=True)
 
 # Set aesthetics
 sns.set_style("whitegrid")
@@ -93,7 +93,7 @@ print(paired_fractions_df)
 # 3 Define functions for analyses
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
-def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform_stat_test = False):
+def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform_stat_test = False, immune = False):
     # Split data into pre- and post-treatment
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
 
@@ -125,12 +125,11 @@ def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform
                 x_right = x_map[celltype] + offset  # resection x-position
                 y_bio = row['Biopsy']
                 y_res = row['Resection']
-
                 color = 'blue' if y_res > y_bio else 'red'
                 ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
 
         if perform_stat_test==True:
-            stat_df_annot = stat_testing(df, cell_fraction_cols, output_dir, stat_test)
+            stat_df_annot = paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test)
 
             # Generate pairs for significant comparisons only
             alpha = 0.05
@@ -141,18 +140,17 @@ def celltype_fraction_shifts(df, category, output_dir, stat_test = None, perform
             annot.configure(text_format="star")
             annot.set_pvalues_and_annotate(sig_df['pval'])
 
-
         plt.xticks(rotation=45, ha='right')
         plt.xlabel("Cell Type")
         plt.ylabel("Fraction")
-        plt.title("Cell Type Fractions in Biopsy vs Resection")
+        plt.title("Cell Type Fractions in Biopsy vs Resection") if immune==False else plt.title("Immune Cell Type Fractions in Biopsy vs Resection")
         plt.legend(title='Sample Type')
         plt.tight_layout()
-        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg')
+        plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
 
 
 # Perform statistical testing
-def stat_testing(df, cell_fraction_cols, output_dir, stat_test):
+def paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test, immune=False):
     # Perform statistical test for each cell type
     stat_results = []
     for celltype in cell_fraction_cols:
@@ -163,7 +161,7 @@ def stat_testing(df, cell_fraction_cols, output_dir, stat_test):
         stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
 
     stat_df = pd.DataFrame(stat_results)
-    stat_df.to_csv(f'{output_dir}/results/analysis/celltype_fraction/celltype_fraction_statistical_results.csv', index=False)
+    stat_df.to_csv(f'{output_dir}/results/analysis/celltype_fraction/celltype_fraction_statistical_results.csv', index=False) if immune==False else stat_df.to_csv(f'{output_dir}/results/analysis/celltype_fraction/immune_celltype_fraction_statistical_results.csv', index=False)
     print(stat_df)
 
     # Prepare stat_df for Annotator (expected format to be able to draw asterisks on plot)
@@ -174,10 +172,15 @@ def stat_testing(df, cell_fraction_cols, output_dir, stat_test):
     return stat_df_annot
 
 
+def celltype_fraction_composition():
+
+
+
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir, stat_test=wilcoxon, perform_stat_test=True)
+celltype_fraction_shifts(paired_fractions_df, category = None, output_dir, stat_test=wilcoxon, perform_stat_test=True)
 
 if immune==True:
     # Focus on immune cell types only
@@ -189,8 +192,8 @@ if immune==True:
     df_immune = paired_fractions_df[['pt_id', 'sample_type'] + cell_fraction_cols].copy()
     df_immune[cell_fraction_cols] = df_immune[cell_fraction_cols].div(df_immune[cell_fraction_cols].sum(axis=1), axis=0)
     paired_fractions_df = df_immune
-    celltype_fraction_shifts(paired_fractions_df, None, output_plot_dir, stat_test=wilcoxon, perform_stat_test=False)
+    celltype_fraction_shifts(paired_fractions_df, None, output_dir, stat_test=wilcoxon, perform_stat_test=False, immune=True)
 
-
+celltype_fraction_composition(fractions_df, category = 'MPR', output_plot_dir, stat_test = ttest_rel, perform_stat_test=False)
 
 
