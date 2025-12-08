@@ -140,19 +140,14 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
         plt.tight_layout()
         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
 
-
-
-
-
-
     elif category != None:   # Split into groups based on chosen category
         print(df)
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(14, 8))
         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
 
         # Plot stripplot with lines connecting paired samples
-        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, dodge=True, jitter=False, size=7, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
+        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", col=category, dodge=True, jitter=False, size=5, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
         
         # Loop over each axis to add lines
         for ax, (cat_value, subdata) in zip(g.axes.flat, df_melted.groupby(category)):
@@ -160,7 +155,7 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
             wide = subdata.pivot_table(index='pt_id', columns=['variable', 'sample_type'], values='value')
             # x positions of categorical axis
             categories = subdata['variable'].unique()
-            xticks = g.ax.get_xticks()
+            xticks = ax.get_xticks()
             x_map = dict(zip(categories, xticks))
             offset = 0.18 # offset for biopsy vs resection points
 
@@ -301,20 +296,13 @@ def paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test, immune=Fa
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#celltype_fraction_shifts(paired_fractions_df, output_dir, category = 'MPR', stat_test=wilcoxon, perform_stat_test=False, immune=False)
+celltype_fraction_shifts(paired_fractions_df, output_dir, category = 'MPR', stat_test=wilcoxon, perform_stat_test=False, immune=False)
 
 if immune==True:
     # Focus on immune cell types only
-    # cell_fraction_cols = sorted([col for col in paired_fractions_df.columns if col.endswith('fraction')])
     non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
     to_exclude = set(non_immune).intersection(paired_fractions_df.columns)
     print(f'Excluding non-immune cell types: {to_exclude}')
-    # cell_fraction_cols = [col for col in cell_fraction_cols if col not in non_immune]
-    
-    # Recalculate fraction
-    # df_immune = paired_fractions_df[['pt_id', 'sample_type'] + cell_fraction_cols].copy()
-    # df_immune[cell_fraction_cols] = df_immune[cell_fraction_cols].div(df_immune[cell_fraction_cols].sum(axis=1), axis=0)
-    # paired_fractions_df = df_immune
 
     df_immune = paired_fractions_df.drop(labels=to_exclude, axis=1)
     celltype_fraction_shifts(df_immune, output_dir, category='MPR', stat_test=wilcoxon, perform_stat_test=False, immune=True)
