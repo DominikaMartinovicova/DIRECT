@@ -48,36 +48,7 @@ immune=True
 # Set aesthetics
 sns.set_style("whitegrid")
 
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# 2 Create fractions dataframe
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Calculate fractions per T_number
-fractions_df = pd.DataFrame(dtype=object)
-for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
-    print(f'Processing {i}. T_number: {element}')
-    adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
-    total_cells_temp = adata_temp.shape[0] # Total number of cells for this T_number
-    temp_fractions = adata_temp.obs[celltype_key].value_counts()/total_cells_temp # Calculate fractions
-    fractions_df = pd.concat([fractions_df, temp_fractions.rename(element)], axis=1) # Save fractions to df
 
-    # Add metadata to the fractions_df
-    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme'] #'structure',
-    for meta in meta_list: 
-        fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
-
-# Adjust dataframe for plotting
-fractions_df = fractions_df.T.fillna(0) # Transpose for easier plotting and fill NaNs with 0
-fractions_df.columns = [f'{col} fraction' if col not in meta_list else col for col in fractions_df.columns] # Add suffix to fraction columns
-fractions_df['MPR'] = np.where(fractions_df['regression']>=90, '>=90', '<90') # Create MPR column
-fractions_df['treatment'] = np.where(fractions_df['treatment_scheme'] == 'v1.7', 'aggressive', 'milder') # Create treatment column
-print(fractions_df.head())
-
-# Keep only patients with matched biopsy and resection samples
-resection_pts = fractions_df[fractions_df['sample_type']=='Resection']['pt_id'].tolist()
-biopsy_pts = fractions_df[fractions_df['sample_type']=='Biopsy']['pt_id'].tolist()
-paired_pts = list(set(resection_pts) & set(biopsy_pts))
-paired_fractions_df = fractions_df[fractions_df['pt_id'].isin(paired_pts)]
-print(f'Number of paired patients: {len(paired_fractions_df["pt_id"].unique())}')
 print(paired_fractions_df)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -93,7 +64,7 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
         
         # Plot stripplot with lines connecting paired samples
-        ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=7, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
+        ax = sns.stripplot(data = df_melted, x = 'variable', y = 'value', hue='sample_type', dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
 
         # Prepare the data for line plotting
         wide = df_melted.pivot_table(index='pt_id', columns=['variable', 'sample_type'], values='value')
@@ -133,6 +104,7 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
         plt.legend(title='Sample Type')
         plt.tight_layout()
         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/immune_celltype_fraction_shifts.svg', format='svg')
+        plt.close()
 
     elif category != None:   # Split into groups based on chosen category
         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
@@ -191,7 +163,7 @@ def celltype_fraction_shifts(df, output_dir, category, stat_test = None, perform
         g.legend.set_loc('upper right')
         plt.tight_layout()
         plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_celltype_fraction_shifts.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/plots/analysis/celltype_fraction/{category}_immune_celltype_fraction_shifts.svg', format='svg')
-
+        plt.close()
 
 # Perform statistical testing
 def paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test, immune=False):
@@ -252,19 +224,57 @@ def paired_stat_testing(df, cell_fraction_cols, output_dir, stat_test, immune=Fa
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 2 Create fractions dataframe
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Calculate fractions per T_number
+fractions_df = pd.DataFrame(dtype=object)
+for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
+    print(f'Processing {i}. T_number: {element}')
+    adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
+    total_cells_temp = adata_temp.shape[0] # Total number of cells for this T_number
+    temp_fractions = adata_temp.obs[celltype_key].value_counts()/total_cells_temp # Calculate fractions
+    fractions_df = pd.concat([fractions_df, temp_fractions.rename(element)], axis=1) # Save fractions to df
+
+    # Add metadata to the fractions_df
+    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme'] #'structure',
+    for meta in meta_list: 
+        fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
+
+# Adjust dataframe for plotting
+fractions_df = fractions_df.T.fillna(0) # Transpose for easier plotting and fill NaNs with 0
+fractions_df.columns = [f'{col} fraction' if col not in meta_list else col for col in fractions_df.columns] # Add suffix to fraction columns
+fractions_df['MPR'] = np.where(fractions_df['regression']>=90, '>=90', '<90') # Create MPR column
+fractions_df['treatment'] = np.where(fractions_df['treatment_scheme'] == 'v1.7', 'aggressive', 'milder') # Create treatment column
+print(fractions_df.head())
+
+# Keep only patients with matched biopsy and resection samples
+resection_pts = fractions_df[fractions_df['sample_type']=='Resection']['pt_id'].tolist()
+biopsy_pts = fractions_df[fractions_df['sample_type']=='Biopsy']['pt_id'].tolist()
+paired_pts = list(set(resection_pts) & set(biopsy_pts))
+paired_fractions_df = fractions_df[fractions_df['pt_id'].isin(paired_pts)]
+print(f'Number of paired patients: {len(paired_fractions_df["pt_id"].unique())}')
+print(paired_fractions_df.head())
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 categories = ['MPR', None, 'treatment']
 for category in categories:
     print(f'Analyzing category: {category}')
     celltype_fraction_shifts(paired_fractions_df, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=False)
-        # Focus on immune cell types only
+        
+for category in categories:    
+    # Focus on immune cell types only
     non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
     to_exclude = set(non_immune).intersection(paired_fractions_df.columns)
     print(f'Excluding non-immune cell types: {to_exclude}')
-
-    df_immune = paired_fractions_df.drop(labels=to_exclude, axis=1)
-    celltype_fraction_shifts(df_immune, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=True)s
+    df_only_immune = paired_fractions_df.drop(labels=to_exclude, axis=1)
+    
+    df_only_immune = df_only_immune[df_only_immune.columns[df_only_immune.columns.str.contains(' fraction')]]  # only keep columns that have ' fraction' in their name
+    df_immune = df_only_immune.div(df_only_immune.sum(axis=1), axis=0)  # Re-normalize to sum to 1
+    df_immune[['pt_id', 'sample_type', 'MPR', 'treatment']] = paired_fractions_df[['pt_id', 'sample_type', 'MPR', 'treatment']].values # Add metadata back
+    print(df_immune.head())
+    celltype_fraction_shifts(df_immune, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=True)
 
 
 #celltype_fraction_composition(fractions_df, category = 'MPR', output_dir=output_dir)#, stat_test = ttest_rel, perform_stat_test=False)
