@@ -52,8 +52,7 @@ print('Reading data...')
 adata = sc.read_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/Neutro_Epi_extImm_combined_adatas.h5ad')
 celltype_key = 'Neutro_Epi_extImm'
 output_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/celltype_fraction/'
-#immune=True
-exclude_v17 = False
+exclude_v17 = True
 # Set aesthetics
 sns.set_style("whitegrid")
 
@@ -251,7 +250,7 @@ def celltype_fraction_shifts_box(df, output_dir, category=None, stat_test=ttest_
     if category != None:
         # Calculate the difference between resection and biopsy for each pair
         diff_df = resection_fractions-biopsy_fractions 
-        diff_df[category] = resection_df[category]
+        diff_df[category] = resection_df[category].values
         print(diff_df.head())
         diff_df_melted = pd.melt(diff_df, id_vars=[category], value_vars=cell_fraction_cols)
         diff_df_melted['variable'] = diff_df_melted['variable'].str.replace(' fraction','')
@@ -261,7 +260,7 @@ def celltype_fraction_shifts_box(df, output_dir, category=None, stat_test=ttest_
         plt.xlabel("Cell Type")
         plt.ylabel("Shift in Fraction (Resection - Biopsy)")
         plt.tight_layout()
-        plt.savefig(f'{output_dir}{category}celltype_fraction_shift_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}immune_celltype_fraction_shift_box.svg', format='svg')
+        plt.savefig(f'{output_dir}{category}_celltype_fraction_shift_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shift_box.svg', format='svg')
 
 
 
