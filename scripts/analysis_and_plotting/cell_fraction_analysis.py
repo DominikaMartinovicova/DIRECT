@@ -213,7 +213,8 @@ def celltype_fraction_composition_box(df, output_dir, category=None, stat_test=N
         plt.legend(title='Sample Type')
         plt.tight_layout()
         plt.savefig(f'{output_dir}/celltype_fraction_composition_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}/immune_celltype_fraction_composition_box.svg', format='svg')
-
+        plt.close()
+        
     elif category != None:
         plt.figure(figsize=(12, 6))
         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
@@ -225,6 +226,7 @@ def celltype_fraction_composition_box(df, output_dir, category=None, stat_test=N
         g.set_ylabels("Fraction")
         plt.tight_layout()
         plt.savefig(f'{output_dir}{category}_celltype_fraction_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_box.svg', format='svg')
+        plt.close()
 
 def celltype_fraction_shifts_box(df, output_dir, category=None, stat_test=ttest_ind, perform_stat_test=False, immune=False):
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
@@ -239,6 +241,7 @@ def celltype_fraction_shifts_box(df, output_dir, category=None, stat_test=ttest_
         # Calculate the difference between resection and biopsy for each pair
         diff_df = resection_fractions-biopsy_fractions #.values.set_index(resection_fractions.index)
         diff_df.columns = diff_df.columns.str.replace(' fraction','')
+        plt.figure(figsize=(12, 6))
         sns.boxplot(diff_df)
         plt.title("Cell Type Fractions Shift") if immune==False else plt.title("Immune Cell Type Fractions Shift")
         plt.xticks(rotation=45, ha='right')
@@ -246,14 +249,16 @@ def celltype_fraction_shifts_box(df, output_dir, category=None, stat_test=ttest_
         plt.ylabel("Shift in Fraction (Resection - Biopsy)")
         plt.tight_layout()
         plt.savefig(f'{output_dir}celltype_fraction_shift_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}immune_celltype_fraction_shift_box.svg', format='svg')
+        plt.close()
 
-    if category != None:
+    elif category != None:
         # Calculate the difference between resection and biopsy for each pair
         diff_df = resection_fractions-biopsy_fractions 
         diff_df[category] = resection_df[category].values
         print(diff_df.head())
         diff_df_melted = pd.melt(diff_df, id_vars=[category], value_vars=cell_fraction_cols)
         diff_df_melted['variable'] = diff_df_melted['variable'].str.replace(' fraction','')
+        plt.figure(figsize=(12, 6))
         sns.boxplot(data=diff_df_melted, x="variable", y="value", hue=category, palette='tab20')
         plt.title("Cell Type Fractions Shift") if immune==False else plt.title("Immune Cell Type Fractions Shift")
         plt.xticks(rotation=45, ha='right')
@@ -261,7 +266,7 @@ def celltype_fraction_shifts_box(df, output_dir, category=None, stat_test=ttest_
         plt.ylabel("Shift in Fraction (Resection - Biopsy)")
         plt.tight_layout()
         plt.savefig(f'{output_dir}{category}_celltype_fraction_shift_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shift_box.svg', format='svg')
-
+        plt.close()
 
 
 
