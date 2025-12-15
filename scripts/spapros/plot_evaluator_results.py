@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import pickle
+import holoviews as hv
 
 with open('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/evaluator_results.pkl', 'rb') as f:
     results = pickle.load(f)
@@ -44,6 +45,7 @@ plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/pl
 plt.close()
 
 class_matrix = results['results']['forest_clfs']['xenium_io']
+class_matrix.to_csv('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/confusion_matrix.csv')
 plt.figure(figsize=(18,18))
 sns.heatmap(class_matrix, annot=True, fmt='.2f')
 plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/conf_matrix.svg', format='svg', bbox_inches='tight')
@@ -53,6 +55,7 @@ plt.close()
 
 # Subset Tcells
 tcell_class_matrix = class_matrix.loc[class_matrix.index.str.contains('T cell'), class_matrix.columns.str.contains('T cell')]
+tcell_class_matrix.to_csv('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/tcell_confusion_matrix.csv')
 plt.figure(figsize=(8,8))
 sns.heatmap(tcell_class_matrix, annot=True, fmt='.2f')
 plt.title('Confusion Matrix Classification Accuracy - T Cells')
@@ -87,3 +90,18 @@ plt.ylabel('Mean kNN overlap')
 plt.tight_layout()
 plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/knn_overlap.svg', format='svg', bbox_inches='tight')
 plt.close()
+
+# Plot a Sankey flow diagram for cell type mapping
+# print("Plotting Sankey diagrams...")
+# class_matrix_melted = class_matrix.reset_index().melt(id_vars='index')
+# class_matrix_melted.columns = ['True Cell Type', 'Predicted Cell Type', 'Accuracy']
+# print(class_matrix_melted.head())
+# sankey = hv.Sankey(class_matrix_melted,label='Celltype Mapping')
+# plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/sankey_diagram.svg', format='svg', bbox_inches='tight')
+# plt.close()
+
+# tcell_class_matrix_melted = tcell_class_matrix.reset_index().melt(id_vars='index')
+# tcell_class_matrix_melted.columns = ['True Cell Type', 'Predicted Cell Type', 'Accuracy']
+# tcell_sankey = hv.Sankey(tcell_class_matrix_melted, label='T Celltype Mapping')
+# plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/tcell_sankey_diagram.svg', format='svg', bbox_inches='tight')
+# plt.close()
