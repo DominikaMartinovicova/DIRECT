@@ -203,7 +203,7 @@ def paired_stat_testing(df, cell_fraction_cols, output_dir, exclude_v17, stat_te
 
 
 
-def celltype_fraction_composition_box(df, output_dir, exclude_v17category=None, stat_test=None, perform_stat_test=False, immune=False):
+def celltype_fraction_composition_box(df, output_dir, exclude_v17, category=None, stat_test=None, perform_stat_test=False, immune=False):
     print(df)
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
     
@@ -239,7 +239,7 @@ def celltype_fraction_composition_box(df, output_dir, exclude_v17category=None, 
         g.set_xlabels("Cell Type")
         g.set_ylabels("Fraction")
         plt.tight_layout()
-        plt.savefig(f'{output_dir}{category}_celltype_fraction_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_box.svg', format='svg')
+        plt.savefig(f'{output_dir}{category}_celltype_fraction_composition_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_composition_box.svg', format='svg')
         plt.close()
 
 def celltype_fraction_shifts_box(df, output_dir, exclude_v17, category=None, stat_test=ttest_ind, perform_stat_test=False, immune=False):
@@ -279,6 +279,11 @@ def celltype_fraction_shifts_box(df, output_dir, exclude_v17, category=None, sta
         print(diff_df.head())
         diff_df_melted = pd.melt(diff_df, id_vars=[category], value_vars=cell_fraction_cols)
         diff_df_melted['variable'] = diff_df_melted['variable'].str.replace(' fraction','')
+
+        # ensure consistent (alphabetical) order of categories
+        cat_order = sorted(diff_df_melted[category].dropna().unique())
+        diff_df_melted[category] = pd.Categorical(diff_df_melted[category],categories=cat_order, ordered=True)
+
         plt.figure(figsize=(12, 6))
         sns.boxplot(data=diff_df_melted, x="variable", y="value", hue=category, palette='tab20')
         if immune==False and exclude_v17==False:
@@ -343,11 +348,11 @@ print(paired_fractions_df.head())
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-categories = ['MPR', None, 'treatment']
+categories = [None,'MPR', 'treatment']
 for category in categories:
     print(f'Analyzing category: {category}')
     celltype_fraction_shifts_lineplot(paired_fractions_df, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=False, exclude_v17=exclude_v17)
-    celltype_fraction_composition_box(fractions_df, category = category, output_dir=output_dir, immune=False)#, stat_test = ttest_rel, perform_stat_test=False,exclude_v17=exclude_v17)
+    celltype_fraction_composition_box(fractions_df, category = category, exclude_v17=exclude_v17, output_dir=output_dir, immune=False)#, stat_test = ttest_rel, perform_stat_test=False,exclude_v17=exclude_v17)
     celltype_fraction_shifts_box(paired_fractions_df, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=False, exclude_v17=exclude_v17)
 
 
@@ -365,6 +370,6 @@ print(df_immune.head())
 for category in categories:    
     celltype_fraction_shifts_lineplot(df_immune, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=True,exclude_v17=exclude_v17)
     celltype_fraction_composition_box(df_immune, category = category, output_dir=output_dir, immune=True, exclude_v17=exclude_v17)#, stat_test = ttest_rel, perform_stat_test=False)
-    celltype_fraction_shifts_box(paired_fractions_df, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=True, exclude_v17=exclude_v17)
+    celltype_fraction_shifts_box(df_immune, output_dir, category=category, stat_test=wilcoxon, perform_stat_test=False, immune=True, exclude_v17=exclude_v17)
 
 
