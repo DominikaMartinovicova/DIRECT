@@ -150,6 +150,6 @@ plt.close()
 # 4 Save 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 sdata.tables['table'] = adata   # Rewrite table to adata with phenotyped cells
-os.rmdir(args.output_dir)
 del adata.uns['celltype_major_mc10'] # del this uns as it somehow is not writeable
+os.rmdir(args.output_dir)  # Remove empty .zarr dir snakemake created, else it won't (over)write it
 sdata.write(args.output_dir)

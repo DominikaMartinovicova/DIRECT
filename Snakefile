@@ -16,15 +16,12 @@ phenotyping_level = ['Salcher_celltypes']#, 'Neutro_Epi_extImm']
 # 0.1 specify target rules
 rule all:
     input:
-        #checked_adatas = data_dir + "combined/{phenotyping_level}_checked_adatas.h5ad"
+        expand(data_dir + "combined/{phenotyping_level}_checked_adatas.h5ad", phenotyping_level=phenotyping_level)
         #expand(data_dir + "combined/{phenotyping_level}_checked_adatas.h5ad", phenotyping_level=phenotyping_level)
-        expand(data_dir + "combined/{phenotyping_level}_combined_sdatas.h5ad", phenotyping_level=phenotyping_level)
+        #expand(data_dir + "combined/{phenotyping_level}_combined_sdatas.h5ad", phenotyping_level=phenotyping_level)
         #expand(data_dir + "phenotyped/{TMA}.zarr/zmetadata", TMA=TMA)
-        #data_dir + "combined/checked_adatas.h5ad"
         #expand(data_dir + "preprocessed/{TMA}.zarr/zmetadata", TMA=TMA),
         # expand(data_dir + "phenotyped/{TMA}.zarr/zmetadata", TMA=TMA),
-        # data_dir + "combined/combined_adatas.h5ad",
-        # data_dir + "combined/checked_adatas.h5ad"
 
 #++++++++++++++++++++++++++++++++++++++++++ 1 Preprocess Xenium data +++++++++++++++++++++++++++++++++++++++++	
 # 1.1 Compress Xenium data to zarr
