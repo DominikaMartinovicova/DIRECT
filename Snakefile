@@ -5,7 +5,7 @@ data_dir = 'data/'
 log_dir = 'logs/preprocessing/'
 TMA = ['slide_3', 'slide_4', 'slide_5', 'slide_6']
 Njob = 4
-phenotyping_level = ['Salcher_celltypes', 'Neutro_Epi_extImm']
+phenotyping_level = ['Salcher_celltypes']#, 'Neutro_Epi_extImm']
 #'extNeutro_extEpi_extImm',
 #'extNeutro_Epi_extImm',
 #'Neutro_Epi_extImm',
@@ -17,7 +17,8 @@ phenotyping_level = ['Salcher_celltypes', 'Neutro_Epi_extImm']
 rule all:
     input:
         #checked_adatas = data_dir + "combined/{phenotyping_level}_checked_adatas.h5ad"
-        expand(data_dir + "combined/{phenotyping_level}_checked_adatas.h5ad", phenotyping_level=phenotyping_level)
+        #expand(data_dir + "combined/{phenotyping_level}_checked_adatas.h5ad", phenotyping_level=phenotyping_level)
+        expand(data_dir + "combined/{phenotyping_level}_combined_sdatas.h5ad", phenotyping_level=phenotyping_level)
         #expand(data_dir + "phenotyped/{TMA}.zarr/zmetadata", TMA=TMA)
         #data_dir + "combined/checked_adatas.h5ad"
         #expand(data_dir + "preprocessed/{TMA}.zarr/zmetadata", TMA=TMA),
@@ -172,13 +173,23 @@ rule cell_fraction_analysis:
 # 2.2 Combine sdatas from all TMAs into one sdata for spatial analysis
 rule combine_sdatas:
     input:
+        phenotyped_Xenium = lambda wildcards: [f"{data_dir}phenotyped/{wildcards.phenotyping_level}/{t}.zarr/zmetadata" for t in TMA]
     output:
+        combined_sdatas = data_dir + "combined/{phenotyping_level}_combined_sdatas.h5ad",
+        output_plots = directory('plots/combined/{phenotyping_level}_spatial/')
+    #conda:
+    #     "/appdata/users/P083831/conda_envs/xenium_py310"
     params:
+        in_dir = data_dir + "phenotyped/{phenotyping_level}/",
+        phen_level = lambda wildcards: wildcards.phenotyping_level
     shell:
         """
+        python3 scripts/preprocessing/combine_sdatas.py \
+	    --input_dir {params.in_dir} \
+        --phen_level {params.phen_level} \
+        -o {output.combined_sdatas} \
+        --output_plot {output.output_plots}
         """
-
-
 
 
 # 2.2 Analyze spatial proximity of cell types
