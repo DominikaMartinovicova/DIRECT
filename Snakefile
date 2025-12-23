@@ -169,6 +169,17 @@ rule cell_fraction_analysis:
         --output_plot {params.out_plot_dir}
         """
 
+# 2.2 Combine sdatas from all TMAs into one sdata for spatial analysis
+rule combine_sdatas:
+    input:
+    output:
+    params:
+    shell:
+        """
+        """
+
+
+
 
 # 2.2 Analyze spatial proximity of cell types
 

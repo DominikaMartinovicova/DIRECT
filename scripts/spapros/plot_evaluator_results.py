@@ -8,7 +8,9 @@ import seaborn as sns
 import pickle
 import holoviews as hv
 
-with open('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/evaluator_results.pkl', 'rb') as f:
+pheno_level = "pooled_A_EM"
+
+with open(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/evaluator_results_{pheno_level}.pkl', 'rb') as f:
     results = pickle.load(f)
 
 print("Spapros Results:")
@@ -40,55 +42,55 @@ for i, col in enumerate(summary.columns):
     plt.tick_params(axis="y", which="major")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
     ax.set_yticklabels(ax.get_yticklabels(), rotation=90)
-plt.suptitle('Spapros Evaluator Summary Metrics')
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/plot_summary.svg', format='svg', bbox_inches='tight')
+plt.suptitle(f'Spapros Evaluator Summary Metrics {pheno_level}')
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/plot_summary_{pheno_level}.svg', format='svg', bbox_inches='tight')
 plt.close()
 
 class_matrix = results['results']['forest_clfs']['xenium_io']
-class_matrix.to_csv('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/confusion_matrix.csv')
+class_matrix.to_csv(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/confusion_matrix_{pheno_level}.csv')
 plt.figure(figsize=(18,18))
 sns.heatmap(class_matrix, annot=True, fmt='.2f')
-plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/conf_matrix.svg', format='svg', bbox_inches='tight')
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/conf_matrix_{pheno_level}.svg', format='svg', bbox_inches='tight')
 plt.title('Confusion Matrix Classifiation Accuracy')
 plt.tight_layout()
 plt.close()
 
 # Subset Tcells
 tcell_class_matrix = class_matrix.loc[class_matrix.index.str.contains('T cell'), class_matrix.columns.str.contains('T cell')]
-tcell_class_matrix.to_csv('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/tcell_confusion_matrix.csv')
+tcell_class_matrix.to_csv(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/tcell_confusion_matrix_{pheno_level}.csv')
 plt.figure(figsize=(8,8))
 sns.heatmap(tcell_class_matrix, annot=True, fmt='.2f')
-plt.title('Confusion Matrix Classification Accuracy - T Cells')
+plt.title(f'Confusion Matrix Classification Accuracy - T Cells {pheno_level}')
 plt.tight_layout()
-plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/tcell_conf_matrix.svg', format='svg',bbox_inches='tight')
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/tcell_conf_matrix_{pheno_level}.svg', format='svg',bbox_inches='tight')
 plt.close()
 
 genecorr_matrix = results['results']['gene_corr']['xenium_io']
 plt.figure(figsize=(12,10))
 sns.heatmap(genecorr_matrix, cmap='bwr')
-plt.title('Gene Correlation Matrix')
+plt.title(f'Gene Correlation Matrix {pheno_level}')
 plt.tight_layout()
-plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/genecorr_matrix.svg', format='svg', bbox_inches='tight')
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/genecorr_matrix_{pheno_level}.svg', format='svg', bbox_inches='tight')
 plt.close()
 
 clust_sim = results['results']['cluster_similarity']['xenium_io']
 plt.figure()
 sns.lineplot(data=clust_sim)
-plt.title('Cluster Similarity')
+plt.title(f'Cluster Similarity {pheno_level}')
 plt.xlabel('Number of clusters')
 plt.ylabel('NMI')
 plt.tight_layout()
-plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/cluster_similarity.svg', format='svg', bbox_inches='tight')
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/cluster_similarity_{pheno_level}.svg', format='svg', bbox_inches='tight')
 plt.close()
 
 knn_overlap = results['results']['knn_overlap']['xenium_io']
 plt.figure()
 sns.lineplot(data=knn_overlap)
-plt.title('KNN Overlap')
+plt.title(f'KNN Overlap {pheno_level}')
 plt.xlabel('Number of clusters')
 plt.ylabel('Mean kNN overlap')
 plt.tight_layout()
-plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/knn_overlap.svg', format='svg', bbox_inches='tight')
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/spapros/knn_overlap_{pheno_level}.svg', format='svg', bbox_inches='tight')
 plt.close()
 
 # Plot a Sankey flow diagram for cell type mapping
