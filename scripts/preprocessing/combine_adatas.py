@@ -74,13 +74,14 @@ os.makedirs(args.output_plot, exist_ok=True)
 # From input directory read all zarr files and combine them into one adata
 #--------------------------------------------------------------------------------
 input_dir = args.input_dir
-for folder in os.listdir(input_dir):    # Loop over all folders and files in the directory
+for i, folder in enumerate(os.listdir(input_dir)):    # Loop over all folders and files in the directory
     if folder.endswith(".zarr"):    # Only select .zarr folders 
         print("Reading " + folder)
         sdata_tmp = sd.read_zarr(input_dir + folder)    # Read the spatial data
         adata_tmp = sdata_tmp.tables["table"]   #Subset for only adata 
         adata_tmp.obs_names = adata_tmp.obs_names + '_' + folder.replace('.zarr','')    # Add identifier to each cell name to prevent duplicates
         adata_tmp.obs['slide'] = folder.replace('.zarr','')     # Add column in .obs to retain information about the data origin
+        adata_tmp.obsm['spatial'][:,0] += i*25000   # Shift spatial coordinates to prevent overlap
         if 'adata_combined' not in locals():
             adata_combined = adata_tmp
         else:
