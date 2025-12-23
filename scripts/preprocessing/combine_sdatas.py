@@ -80,30 +80,35 @@ args = parse_args()
 #input_dir = args.input_dir
 phen_level = 'Neutro_Epi_extImm'
 input_dir = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/phenotyped/{phen_level}/'
-for i, folder in enumerate(os.listdir(input_dir)):    # Loop over all folders and files in the directory
+
+sdatas_dict={}
+for folder in os.listdir(input_dir):    # Loop over all folders and files in the directory
     if folder.endswith(".zarr"):    # Only select .zarr folders 
+        slide = folder.replace('.zarr','')
         print("Reading " + folder)
         sdata_tmp = sd.read_zarr(input_dir + folder)    # Read the spatial data
-        sdata_tmp.tables['table'].obs_names = sdata_tmp.tables['table'].obs_names + '_' + folder.replace('.zarr','')  # Make obs names unique by adding slide name
-        sdata_tmp.tables["table"].obs['slide'] = folder.replace('.zarr','')  # Add slide name to obs
-        # offset spatial coordinates to avoid overlaps
-        offset = i * 25000  
-        for name, shapes in sdata_tmp.shapes.items():
-            shapes_copy = shapes.copy()
-            shapes_copy.geometry = shapes_copy.geometry.apply(lambda g: translate(g, xoff=offset, yoff=0))
-            sdata_tmp.shapes[name] = shapes_copy
-
-        #sdata_tmp=sdata_tmp.transform(x_offset, to_coordinate_system="global")
-        if 'sdata_combined' not in locals():
-            sdata_combined = sdata_tmp
-        else:
-            sdata_combined = sd.concat([sdata_combined, sdata_tmp], coordinate_system="global")
-print("Combined sdata shape: ", sdata_combined.n_obs, sdata_combined.n_vars)
+        sdata_tmp.tables['table'].obs_names = sdata_tmp.tables['table'].obs_names + '_' + slide  # Make obs names unique by adding slide name
+        sdata_tmp.tables["table"].obs['slide'] = slide  # Add slide name to obs
+        sdatas_dict[slide] = sdata_tmp     # Create a dictionary with all sdatas
+print(sdatas_dict)
+sdata_combined = sd.concatenate(sdatas_dict)  # Combine all sdatas into one      
+print("Combined sdata:")
 print(sdata_combined)
-print(sdata_combined.tables["table"])
-sdata_combined.pl.render_shapes('cell_boundaries')
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/combined/{phen_level}_spatial/sdata_cells.png', dpi=300)
-plt.close()
 
+
+
+
+
+
+
+
+
+
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# X Save data
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#os.rmdir(args.output_dir) # Remove empty .zarr dir snakemake created, else it won't (over)write it
 #sdata_combined.write(args.output)
-sdata_combined.write(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phen_level}_combined_sdatas.h5ad')
+sdata_combined.write(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phen_level}_combined_sdatas.zarr')
+
