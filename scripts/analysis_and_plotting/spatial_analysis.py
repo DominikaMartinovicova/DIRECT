@@ -62,14 +62,33 @@ sq.gr.centrality_scores(adata, cluster_key=celltype_key)
 sq.pl.centrality_scores(adata, cluster_key=celltype_key, 
                         scores=["closeness_centrality", "clustering_coefficient", "degree_centrality"],
                         figsize=(16, 5), show=False)
-plt.savefig(output_dir + 'centrality_scores.svg',format='svg', dpi=300)
+plt.tight_layout()
+plt.savefig(output_dir + 'centrality_scores.svg',format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Compute co-occurrence probability
 #--------------------------------------------------------------------------------
 print('Computing co-occurrence probabilities...')
+sq.gr.co_occurrence(adata, cluster_key=celltype_key)
+sq.pl.co_occurrence(adata, cluster_key=celltype_key, figsize=(8, 6), show=False)
+plt.tight_layout()
+plt.savefig(output_dir + 'co_occurrence_probabilities.svg',format='svg', dpi=300, bbox_inchces='tight')
+plt.close()
 
+# Compute neighbors enrichment
+#--------------------------------------------------------------------------------
+print('Computing neighbors enrichment...')
+sq.gr.nhood_enrichment(adata, cluster_key=celltype_key)
+sq.pl.nhood_enrichment(adata, cluster_key=celltype_key)
+plt.tight_layout()
+plt.savefig(output_dir + 'neighbors_enrichment.svg',format='svg', dpi=300, bbox_inches='tight')
+plt.close()
 
+# Compute Moran's I spatial autocorrelation
+#--------------------------------------------------------------------------------
+print("Computing Moran's I spatial autocorrelation...")
+sq.gr.spatial_autocorr(adata, mode='moran', n_perms=100, n_jobs=1)
+adata.uns['moranI'].head(10)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # X Choose analyses to perform
