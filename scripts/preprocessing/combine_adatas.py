@@ -33,6 +33,7 @@
 # 0 Import libraries and parse arguments
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 import spatialdata as sd
+import squidpy as sq
 import anndata as ad
 import scanpy as sc
 import matplotlib.pyplot as plt
@@ -81,7 +82,7 @@ for i, folder in enumerate(os.listdir(input_dir)):    # Loop over all folders an
         adata_tmp = sdata_tmp.tables["table"]   #Subset for only adata 
         adata_tmp.obs_names = adata_tmp.obs_names + '_' + folder.replace('.zarr','')    # Add identifier to each cell name to prevent duplicates
         adata_tmp.obs['slide'] = folder.replace('.zarr','')     # Add column in .obs to retain information about the data origin
-        adata_tmp.obsm['spatial'][:,0] += i*25000   # Shift spatial coordinates to prevent overlap
+        adata_tmp.obsm['spatial'][:,0] += i*15000   # Shift spatial coordinates to prevent overlap
         if 'adata_combined' not in locals():
             adata_combined = adata_tmp
         else:
@@ -131,6 +132,10 @@ sc.tl.leiden(adata_combined)
 
 print(adata_combined.X.toarray()[0:5,0:5])
 print(adata_combined.layers['raw_counts'].toarray()[0:5,0:5])
+
+sq.pl.spatial_scatter(adata_combined,library_id="spatial",shape=None,color=args.phen_level,size = 1)
+plt.savefig(args.output_plot + "/spatial_combined_adatas.svg", format='svg')
+plt.close()
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 3 Save

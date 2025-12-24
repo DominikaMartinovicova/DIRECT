@@ -27,7 +27,6 @@
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 0 Import libraries
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-import spatialdata as sd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scanpy as sc
@@ -300,10 +299,6 @@ def celltype_fraction_shifts_box(df, output_dir, exclude_v17, category=None, sta
         plt.tight_layout()
         plt.savefig(f'{output_dir}{category}_celltype_fraction_shift_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shift_box.svg', format='svg')
         plt.close()
-
-
-
-
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
