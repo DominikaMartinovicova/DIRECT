@@ -13,7 +13,7 @@
 #       a. Compute centrality scores
 #           i. closeness centrality - measure of how close the group is to other nodes
 #           ii. clustering coefficient - measure of the degree to which nodes cluster together
-#           iii.degree centrality - fraction of non-group members connected to group members
+#           iii. degree centrality - fraction of non-group members connected to group members
 #   5 Save
 #
 #
@@ -60,8 +60,8 @@ sq.gr.spatial_neighbors(adata, coord_type="generic", delaunay=True)
 print('Computing centrality scores...')
 sq.gr.centrality_scores(adata, cluster_key=celltype_key)
 sq.pl.centrality_scores(adata, cluster_key=celltype_key, 
-                        scores=["closeness_centrality", "clustering_coefficient", "degree_centrality"],
-                        figsize=(16, 5), show=False)
+                        score=["average_clustering", "closeness_centrality", "degree_centrality"],
+                        figsize=(16, 5))
 plt.tight_layout()
 plt.savefig(output_dir + 'centrality_scores.svg',format='svg', dpi=300, bbox_inches='tight')
 plt.close()
@@ -70,9 +70,9 @@ plt.close()
 #--------------------------------------------------------------------------------
 print('Computing co-occurrence probabilities...')
 sq.gr.co_occurrence(adata, cluster_key=celltype_key)
-sq.pl.co_occurrence(adata, cluster_key=celltype_key, figsize=(8, 6), show=False)
+sq.pl.co_occurrence(adata, cluster_key=celltype_key, figsize=(8, 6))
 plt.tight_layout()
-plt.savefig(output_dir + 'co_occurrence_probabilities.svg',format='svg', dpi=300, bbox_inchces='tight')
+plt.savefig(output_dir + 'co_occurrence_probabilities.svg',format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Compute neighbors enrichment
@@ -88,8 +88,9 @@ plt.close()
 #--------------------------------------------------------------------------------
 print("Computing Moran's I spatial autocorrelation...")
 sq.gr.spatial_autocorr(adata, mode='moran', n_perms=100, n_jobs=1)
-adata.uns['moranI'].head(10)
+print(adata.uns['moranI'].head(10))
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # X Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+adata.write_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/analyzed/Neutro_Epi_extImm_analyzed.h5ad')

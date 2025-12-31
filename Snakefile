@@ -5,7 +5,9 @@ data_dir = 'data/'
 log_dir = 'logs/preprocessing/'
 TMA = ['slide_3', 'slide_4', 'slide_5', 'slide_6']
 Njob = 4
-phenotyping_level = ['Salcher_celltypes', 'Neutro_Epi_extImm']
+phenotyping_level = ['Neutro_Epi_extImm_pooled_A_EM_N']
+#phenotyping_level = ['Neutro_Epi_extImm']
+#phenotyping_level = ['Salcher_celltypes']
 #'extNeutro_extEpi_extImm',
 #'extNeutro_Epi_extImm',
 #'Neutro_Epi_extImm',
@@ -178,7 +180,7 @@ rule spatial_analysis:
     #conda:
     #    "envs=""
     params:
-        out_plot_dir = 'plots/analysis/spatial_proximity/{phenotyping_level}/',
+        out_plot_dir = 'plots/analysis/spatial/{phenotyping_level}/',
         phen_level = "{phenotyping_level}"
     shell:
         """

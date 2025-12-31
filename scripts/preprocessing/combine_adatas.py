@@ -134,7 +134,7 @@ print(adata_combined.X.toarray()[0:5,0:5])
 print(adata_combined.layers['raw_counts'].toarray()[0:5,0:5])
 
 sq.pl.spatial_scatter(adata_combined,library_id="spatial",shape=None,color=args.phen_level,size = 1)
-plt.savefig(args.output_plot + "/spatial_combined_adatas.svg", format='svg')
+plt.savefig(args.output_plot + "/spatial_combined_adatas.png", dpi=300)
 plt.close()
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
