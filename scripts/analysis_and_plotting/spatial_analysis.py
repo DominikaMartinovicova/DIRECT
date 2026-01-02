@@ -61,27 +61,24 @@ print('Computing centrality scores...')
 sq.gr.centrality_scores(adata, cluster_key=celltype_key)
 sq.pl.centrality_scores(adata, cluster_key=celltype_key, 
                         score=["average_clustering", "closeness_centrality", "degree_centrality"],
-                        figsize=(16, 5))
-plt.tight_layout()
+                        figsize=(16, 5), constrained_layout=True)
 plt.savefig(output_dir + 'centrality_scores.svg',format='svg', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Compute co-occurrence probability
 #--------------------------------------------------------------------------------
-print('Computing co-occurrence probabilities...')
-sq.gr.co_occurrence(adata, cluster_key=celltype_key)
-sq.pl.co_occurrence(adata, cluster_key=celltype_key, figsize=(8, 6))
-plt.tight_layout()
-plt.savefig(output_dir + 'co_occurrence_probabilities.svg',format='svg', dpi=300, bbox_inches='tight')
-plt.close()
+#print('Computing co-occurrence probabilities...')
+#sq.gr.co_occurrence(adata, cluster_key=celltype_key)
+#sq.pl.co_occurrence(adata, cluster_key=celltype_key, figsize=(8, 6))
+#plt.savefig(output_dir + 'co_occurrence_probabilities.svg',format='svg', dpi=300, bbox_inches='tight', constrained_layout=True)
+#plt.close()
 
 # Compute neighbors enrichment
 #--------------------------------------------------------------------------------
 print('Computing neighbors enrichment...')
 sq.gr.nhood_enrichment(adata, cluster_key=celltype_key)
 sq.pl.nhood_enrichment(adata, cluster_key=celltype_key)
-plt.tight_layout()
-plt.savefig(output_dir + 'neighbors_enrichment.svg',format='svg', dpi=300, bbox_inches='tight')
+plt.savefig(output_dir + 'neighbors_enrichment.svg',format='svg', dpi=300, bbox_inches='tight', constrained_layout=True)
 plt.close()
 
 # Compute Moran's I spatial autocorrelation

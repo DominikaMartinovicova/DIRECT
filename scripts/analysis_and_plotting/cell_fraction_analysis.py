@@ -230,23 +230,26 @@ def ind_stat_testing(df, cell_fraction_cols, stat_test, category=None):
             # Ensure paired samples
             stat, p_value = stat_test(biopsy_values, resection_values)
             stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
+            stat_df = pd.DataFrame(stat_results)
+            print(stat_df)
+            # Prepare stat_df for Annotator (expected format to be able to draw asterisks on plot)
+            stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
+            stat_df_annot["group1"] = "Biopsy"
+            stat_df_annot["group2"] = "Resection"
+            stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected forma
         else:
             categories = df[category].unique()
-            for cat in categories:
-                subset = df[df[category]==cat]
-                biopsy_values = subset[subset['sample_type']=='Biopsy'][celltype]
-                resection_values = subset[subset['sample_type']=='Resection'][celltype]
-                stat, p_value = stat_test(biopsy_values, resection_values)
-                stat_results.append({'cell_type': celltype.replace(' fraction',''), 'category': cat, 'statistic': stat, 'p_value': p_value})
+            subset_1 = df[df[category] == categories[0]][celltype]
+            subset_2 = df[df[category] == categories[1]][celltype]
+            stat, p_value = stat_test(subset_1, subset_2)
+            stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
+            stat_df = pd.DataFrame(stat_results)
+            print(stat_df)   
+            stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
+            stat_df_annot["group1"] = categories[0]
+            stat_df_annot["group2"] = categories[1]
+            stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected forma
 
-    stat_df = pd.DataFrame(stat_results)
-    print(stat_df)
-
-    # Prepare stat_df for Annotator (expected format to be able to draw asterisks on plot)
-    stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
-    stat_df_annot["group1"] = "Biopsy"
-    stat_df_annot["group2"] = "Resection"
-    stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected format
     return stat_df, stat_df_annot
 
 
@@ -402,7 +405,7 @@ def celltype_fraction_shifts_box(df, output_dir, output_dir_results, exclude_v17
         ax=sns.boxplot(data=diff_df_melted, x="variable", y="value", hue=category, palette='tab20')
         
         if perform_stat_test == True:
-            stat_df, stat_df_annot = ind_stat_testing(df, cell_fraction_cols, stat_test, category)
+            stat_df, stat_df_annot = ind_stat_testing(diff_df, cell_fraction_cols, stat_test, category)
             if immune==False and exclude_v17==False:
                 stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_celltype_fraction_shift_statistical_results.csv', index=False) 
             elif immune==True and exclude_v17==False:
@@ -487,7 +490,7 @@ for category in categories:
     print(f'Analyzing category: {category}')
     #celltype_fraction_shifts_lineplot(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
     #celltype_fraction_composition_box(fractions_df, output_dir, output_dir_results, category = category, exclude_v17=exclude_v17, immune=False, stat_test = ttest_ind, perform_stat_test=True)
-    celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=ttest_ind, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
 
 
 # Focus on immune cell types only
@@ -504,4 +507,4 @@ print(df_immune.head())
 for category in categories:    
     #celltype_fraction_shifts_lineplot(df_immune, output_dir,output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=True,exclude_v17=exclude_v17)
     #celltype_fraction_composition_box(df_immune, output_dir, output_dir_results, category = category, immune=True, exclude_v17=exclude_v17, stat_test = ttest_ind, perform_stat_test=True)
-    celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=ttest_ind, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
