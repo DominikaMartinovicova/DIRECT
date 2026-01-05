@@ -463,7 +463,7 @@ def celltype_fraction_shifts_box(df, output_dir, output_dir_results, exclude_v17
         plt.xlabel("Cell Type")
         plt.ylabel("Shift in Fraction (Resection - Biopsy)")
         plt.tight_layout()
-        plt.savefig(f'{output_dir}{category}_celltype_fraction_shift_box.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shift_box.svg', format='svg')
+        plt.savefig(f'{output_dir}{category}_celltype_fraction_shift_box_{stat_test.__name__}.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shift_box_{stat_test.__name__}.svg', format='svg')
         plt.close()
 
 
