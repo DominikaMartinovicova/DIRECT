@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# spatial_analysis.py
+# spatial_analysis_old.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
 #   Analyze spatial proximity of cell types.

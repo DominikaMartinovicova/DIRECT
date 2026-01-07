@@ -11,7 +11,7 @@
 # 0 Import libraries
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 import scanpy as sc
-
+import os
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Define functions
@@ -19,6 +19,7 @@ import scanpy as sc
 # Remove v1.7 samples and add MPR column
 #-------------------------------------------------------------------------------
 def preprocess_adata(adata_path, exclude_v17=True):
+    print('Reading adata...')
     adata = sc.read_h5ad(adata_path)
     if exclude_v17 == True:
         print('Excluding v1.7 samples...')
@@ -29,12 +30,24 @@ def preprocess_adata(adata_path, exclude_v17=True):
     adata.obs['MPR'] = "<90" if adata.obs['regression'].iloc[0] < 90 else ">=90"
     print(adata)
     print('Preprocessing done.')
-    return adata
+    samples_list = adata.obs['sample'].unique().tolist()
+    return samples_list, adata
 
+# Save per-sample adatas
+#-------------------------------------------------------------------------------
+def save_per_sample_adata(adata, output_dir):
+    print('Saving per-sample adatas...')
+    os.makedirs(output_dir, exist_ok=True)
+    for i, sample in enumerate(adata.obs['sample'].unique()):
+        print(f'Saving sample {i+1}/{len(adata.obs["sample"].unique())}: {sample}')
+        adata_sample = adata[adata.obs['sample'] == sample, :].copy()
+        adata_sample.write_h5ad(os.path.join(output_dir, f'{sample}_adata.h5ad'))
+    print('Per-sample adatas saved.')
 
 # Create a dictionary with samples as keys and adata subset for that sample as value
 #-------------------------------------------------------------------------------
 def get_sample_dict(adata):
+    print('Creating sample dictionary...')
     sample_dict = {}
     for sample in adata.obs['sample'].unique():
         print(f'Processing sample: {sample}')
@@ -42,3 +55,4 @@ def get_sample_dict(adata):
     print(sample_dict.keys())
     print('Sample dictionary created.')
     return sample_dict
+
