@@ -39,6 +39,7 @@ import numpy as np
 import pandas as pd
 import os
 import pickle
+import argparse
 
 # Parse arguments from commandline
 #--------------------------------------------------------------------------------
@@ -63,7 +64,77 @@ def parse_args():
     return args
 
 args = parse_args()
-os.makedirs(args.output_dir_results, exist_ok=True)
-os.makedirs(args.output_dir_plots, exist_ok=True)
 
-print('Running')
+celltype_key = args.celltype_key
+output_dir_results=args.output_dir_results
+output_dir_plots=args.output_dir_plots
+os.makedirs(output_dir_results, exist_ok=True)
+os.makedirs(output_dir_plots, exist_ok=True)
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 1 Read  data
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Read adata
+print('Reading data...')
+adata = sc.read_h5ad(args.input)
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 2 Perform spatial analysis
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Build a spatial neighborhood graph
+print('Building spatial neighbors graph...')
+sq.gr.spatial_neighbors(adata, coord_type="generic", delaunay=True)
+
+# Compute centrality scores
+#--------------------------------------------------------------------------------
+print('Computing centrality scores...')
+sq.gr.centrality_scores(adata, cluster_key=celltype_key)
+scores = ["average_clustering", "closeness_centrality", "degree_centrality", "betweenness_centrality"]
+centrality_scores_result = adata.uns[celltype_key + '_centrality_scores']
+centrality_scores_result.to_csv(output_dir_results + '/centrality_scores.csv')
+sq.pl.centrality_scores(adata, cluster_key=celltype_key, 
+                        score=scores)
+#plt.savefig(output_dir_plots + '/centrality_scores.svg',format='svg', dpi=300, bbox_inches='tight')
+plt.close()
+
+# Compute neighbors enrichment
+#--------------------------------------------------------------------------------
+print('Computing neighbors enrichment...')
+sq.gr.nhood_enrichment(adata, cluster_key=celltype_key)
+nhood_enrichment_result = adata.uns[celltype_key + '_nhood_enrichment']
+with open(output_dir_results + "/neighbors_enrichment.pkl", "wb") as f:
+    pickle.dump(nhood_enrichment_result, f)
+sq.pl.nhood_enrichment(adata, cluster_key=celltype_key, figsize=(8, 8), cmap='bwr')
+plt.rcParams["font.size"] = 45
+#plt.savefig(output_dir_plots + '/neighbors_enrichment.svg',format='svg', dpi=300, bbox_inches='tight')
+plt.close()
+
+# Compute Moran's I spatial autocorrelation
+#--------------------------------------------------------------------------------
+print("Computing Moran's I spatial autocorrelation...")
+sq.gr.spatial_autocorr(adata, mode='moran', n_perms=100, n_jobs=1)
+#print(adata.uns['moranI'].head(10))
+
+# Compute interaction matrix
+#--------------------------------------------------------------------------------
+sq.gr.interaction_matrix(adata, cluster_key=celltype_key)
+interaction_matrix_result = adata.uns['interaction_matrix']
+interaction_matrix_result.to_csv(output_dir_results + "interaction_matrix.csv")
+
+# Compute co-occurrence probability
+#--------------------------------------------------------------------------------
+print('Computing co-occurrence probabilities...')
+sq.gr.co_occurrence(adata, cluster_key=celltype_key)
+co_occurrence_result = adata.uns[celltype_key + '_co_occurrence']
+with open(output_dir_results + "/co_occurrence_probabilities.pkl", "wb") as f:
+    pickle.dump(co_occurrence_result, f)
+for celltype in adata.obs[celltype_key].unique().tolist():
+#    print(f'Plotting cell type: {celltype}')
+    sq.pl.co_occurrence(adata, cluster_key=celltype_key, clusters=celltype, figsize=(12, 9))
+#    plt.savefig(output_dir_plots + f'/co_occurrence_probabilities_{celltype}.svg',format='svg', dpi=300, bbox_inches='tight')
+    plt.close()
+#sq.gr.co_occurrence(adata, cluster_key=celltype_key)
+#sq.pl.co_occurrence(adata, cluster_key=celltype_key) #, figsize=(8, 6))
+#plt.savefig(output_dir + 'co_occurrence_probabilities.svg',format='svg', dpi=300, bbox_inches='tight')
+#plt.close()
+
