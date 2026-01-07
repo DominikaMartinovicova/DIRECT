@@ -117,9 +117,11 @@ sq.gr.spatial_autocorr(adata, mode='moran', n_perms=100, n_jobs=1)
 
 # Compute interaction matrix
 #--------------------------------------------------------------------------------
+print('Computing interaction matrix...')
 sq.gr.interaction_matrix(adata, cluster_key=celltype_key)
-interaction_matrix_result = adata.uns['interaction_matrix']
-interaction_matrix_result.to_csv(output_dir_results + "interaction_matrix.csv")
+interaction_matrix_result = adata.uns[celltype_key + '_interactions']
+with open(output_dir_results + "/interaction_matrix.pkl", "wb") as f:
+    pickle.dump(interaction_matrix_result, f)
 
 # Compute co-occurrence probability
 #--------------------------------------------------------------------------------
