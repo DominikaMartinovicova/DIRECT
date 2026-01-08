@@ -45,9 +45,9 @@ import argparse
 #--------------------------------------------------------------------------------
 def parse_args():
     "Parse inputs from commandline and returns them as a Namespace object."
-    parser = argparse.ArgumentParser(prog = 'python3 Run_tacco.py',
+    parser = argparse.ArgumentParser(prog = 'python3 spatial_analysis.py',
         formatter_class = argparse.RawTextHelpFormatter, description =
-        '  Run tacco to transfer the cell labels from reference scRNA atlas. Preprocess datasets individually for potential inspection  ')
+        '  Spatially analyze each sample.  ')
     parser.add_argument('-i', help='path to adata sample subset',
                         dest='input',
                         type=str)

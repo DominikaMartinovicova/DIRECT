@@ -11,14 +11,16 @@
 # 0 Import libraries
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 import scanpy as sc
+import numpy as np
 import os
+import pandas as pd
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Define functions
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Remove v1.7 samples and add MPR column
 #-------------------------------------------------------------------------------
-def preprocess_adata(adata_path, exclude_v17=True):
+def preprocess_adata(adata_path, exclude_v17=True,phenotyping_level=None):
     print('Reading adata...')
     adata = sc.read_h5ad(adata_path)
     if exclude_v17 == True:
@@ -27,8 +29,10 @@ def preprocess_adata(adata_path, exclude_v17=True):
     
     # Add MPR column
     print('Adding MPR column...')
-    adata.obs['MPR'] = "<90" if adata.obs['regression'].iloc[0] < 90 else ">=90"
+    reg = pd.to_numeric(adata.obs['regression'], errors="coerce")
+    adata.obs['MPR'] = np.where(reg < 90.0,"<90",">=90")
     print(adata)
+    adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad")
     print('Preprocessing done.')
     samples_list = adata.obs['sample'].unique().tolist()
     return samples_list, adata
