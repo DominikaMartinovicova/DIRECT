@@ -102,44 +102,53 @@ def stat_analysis_centrality_scores(input_file, output_dir_report, output_dir_pl
             plt.savefig(os.path.join(output_dir_plots, f'centrality_scores/{key}_by_{category}.svg'), format='svg', bbox_inches='tight')
             plt.close()
 
-# def stat_analysis_nhood_enrichment(input_file, output_dir_report, output_dir_plots, category, mode, cell_types):
-#     # Neighborhood enrichment analysis and plotting
-#     #------------------------------------------------------------------------------
-#     nhood_enrichment = input_file
-#     if category == None:
-#         biopsy_samples = {}
-#         resection_samples = {}
-#         for sample in nhood_enrichment.keys():
-#             if nhood_enrichment[sample]['sample_type']=='Biopsy':
-#                 biopsy_samples[sample] = nhood_enrichment[sample]
-#             elif nhood_enrichment[sample]['sample_type']=='Resection':
-#                 resection_samples[sample] = nhood_enrichment[sample]
+def stat_analysis_nhood_enrichment(input_file, output_dir_report, output_dir_plots, category, mode, cell_types):
+    # Neighborhood enrichment analysis and plotting
+    #------------------------------------------------------------------------------
+    nhood_enrichment = input_file
+    if category == None:
+        biopsy_samples = {}
+        resection_samples = {}
+        for sample in nhood_enrichment.keys():
+            if nhood_enrichment[sample]['sample_type']=='Biopsy':
+                biopsy_samples[sample] = nhood_enrichment[sample]
+            elif nhood_enrichment[sample]['sample_type']=='Resection':
+                resection_samples[sample] = nhood_enrichment[sample]
         
-#         # Calculate average in each group
-#         zscore_biopsy = [biopsy_samples[sample][mode] for sample in biopsy_samples.keys()]
-#         for i, arr in enumerate(zscore_biopsy):
-#             print(f"Array {i}: shape = {arr.shape}")
+        # Calculate average in each group
+        zscore_biopsy = [biopsy_samples[sample][mode] for sample in biopsy_samples.keys()]
+        for i, arr in enumerate(zscore_biopsy):
+            print(f"Array {i}: shape = {arr.shape}")
 
-#         mean_zscore_biopsy = np.mean(np.stack(zscore_biopsy, axis=0), axis=0)
+        mean_zscore_biopsy = np.mean(np.stack(zscore_biopsy, axis=0), axis=0)
 
-#         # Calculate average in each group
-#         zscore_resection = [resection_samples[sample][mode] for sample in resection_samples.keys()]
-#         mean_zscore_resection = np.mean(np.stack(zscore_resection, axis=0), axis=0)
+        # Calculate average in each group
+        zscore_resection = [resection_samples[sample][mode] for sample in resection_samples.keys()]
+        mean_zscore_resection = np.mean(np.stack(zscore_resection, axis=0), axis=0)
 
-#         # Plot heatmaps
-#         plt.figure(figsize=(20,15))
-#         sns.heatmap(mean_zscore_biopsy, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
-#         plt.title(f'Average neighborhood enrichment {mode} - Biopsy samples')
-#         plt.tight_layout()
-#         plt.savefig(os.path.join(output_dir_plots, f'neighborhood_enrichment/average_{mode}_biopsy.svg'), format='svg', bbox_inches='tight')
-#         plt.close()
+        # Plot heatmaps
+        plt.figure(figsize=(20,15))
+        sns.heatmap(mean_zscore_biopsy, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Average neighborhood enrichment {mode} - Biopsy samples')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'neighborhood_enrichment/average_{mode}_biopsy.svg'), format='svg', bbox_inches='tight')
+        plt.close()
 
-#         plt.figure(figsize=(20,15))
-#         sns.heatmap(mean_zscore_resection, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
-#         plt.title(f'Average neighborhood enrichment {mode} - Resection samples')
-#         plt.tight_layout()
-#         plt.savefig(os.path.join(output_dir_plots, f'neighborhood_enrichment/average_{mode}_resection.svg'), format='svg', bbox_inches='tight')
-#         plt.close()
+        plt.figure(figsize=(20,15))
+        sns.heatmap(mean_zscore_resection, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Average neighborhood enrichment {mode} - Resection samples')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'neighborhood_enrichment/average_{mode}_resection.svg'), format='svg', bbox_inches='tight')
+        plt.close()
+
+        # Plot heatmap of differnce Resection-Biopsy
+        diff_zscore = mean_zscore_resection - mean_zscore_biopsy
+        plt.figure(figsize=(20,15))
+        sns.heatmap(diff_zscore, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Difference in average neighborhood enrichment {mode} (Resection - Biopsy)')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'neighborhood_enrichment/difference_{mode}_resection_minus_biopsy.svg'), format='svg', bbox_inches='tight')
+        plt.close()
 
 #     elif category != None:
 #         print('Statistical analysis by category not yet implemented for neighborhood enrichment.')
@@ -148,17 +157,29 @@ def stat_analysis_interaction_matrices(input_file, output_dir_report, output_dir
     # Interaction matrix analysis and plotting
     #------------------------------------------------------------------------------
     interaction_matrices = input_file
-    print(interaction_matrices.keys())
-    print(interaction_matrices[list(interaction_matrices.keys())[0]])
+    biopsy_samples = {}
+    resection_samples = {}
+    for sample in interaction_matrices.keys():
+        if interaction_matrices[sample]['sample_type']=='Biopsy':
+            biopsy_samples[sample] = interaction_matrices[sample]
+        elif interaction_matrices[sample]['sample_type']=='Resection':
+            resection_samples[sample] = interaction_matrices[sample]
+
+    biopsy_lowMPR_samples = {}
+    biopsy_highMPR_samples = {}
+    resection_lowMPR_samples = {}
+    resection_highMPR_samples = {}
+    for sample in interaction_matrices.keys():
+        if interaction_matrices[sample]['sample_type']=='Biopsy' and interaction_matrices[sample]['MPR']=='<90':
+            biopsy_lowMPR_samples[sample] = interaction_matrices[sample]
+        elif interaction_matrices[sample]['sample_type']=='Biopsy' and interaction_matrices[sample]['MPR']=='>=90':
+            biopsy_highMPR_samples[sample] = interaction_matrices[sample]
+        elif interaction_matrices[sample]['sample_type']=='Resection' and interaction_matrices[sample]['MPR']=='<90':
+            resection_lowMPR_samples[sample] = interaction_matrices[sample]
+        elif interaction_matrices[sample]['sample_type']=='Resection' and interaction_matrices[sample]['MPR']=='>=90':
+            resection_highMPR_samples[sample] = interaction_matrices[sample]
+
     if category == None:
-        biopsy_samples = {}
-        resection_samples = {}
-        for sample in interaction_matrices.keys():
-            if interaction_matrices[sample]['sample_type']=='Biopsy':
-                biopsy_samples[sample] = interaction_matrices[sample]
-            elif interaction_matrices[sample]['sample_type']=='Resection':
-                resection_samples[sample] = interaction_matrices[sample]
-        
         # Calculate average in each group
         matrix_biopsy = [biopsy_samples[sample]['matrix'] for sample in biopsy_samples.keys()]
         mean_matrix_biopsy = np.mean(np.stack(matrix_biopsy, axis=0), axis=0)
@@ -182,8 +203,119 @@ def stat_analysis_interaction_matrices(input_file, output_dir_report, output_dir
         plt.savefig(os.path.join(output_dir_plots, f'interaction_matrices/average_interaction_matrix_resection.svg'), format='svg', bbox_inches='tight')
         plt.close()
 
+        # Plot heatmap of differnce Resection-Biopsy
+        diff_matrix = mean_matrix_resection - mean_matrix_biopsy
+        plt.figure(figsize=(20,15))
+        sns.heatmap(diff_matrix, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Difference in average interaction matrix (Resection - Biopsy)')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'interaction_matrices/difference_interaction_matrix.svg'), format='svg', bbox_inches='tight')
+        plt.close()
+    
     elif category != None:
-        print('Statistical analysis by category not yet implemented for interaction matrices.')
+        matrix_biopsy_lowMPR = [biopsy_lowMPR_samples[sample]['matrix'] for sample in biopsy_lowMPR_samples.keys()]
+        mean_matrix_biopsy_lowMPR = np.mean(np.stack(matrix_biopsy_lowMPR, axis=0), axis=0)
+        matrix_biopsy_highMPR = [biopsy_highMPR_samples[sample]['matrix'] for sample in biopsy_highMPR_samples.keys()]
+        mean_matrix_biopsy_highMPR = np.mean(np.stack(matrix_biopsy_highMPR, axis=0), axis=0)
+        matrix_resection_lowMPR = [resection_lowMPR_samples[sample]['matrix'] for sample in resection_lowMPR_samples.keys()]
+        mean_matrix_resection_lowMPR = np.mean(np.stack(matrix_resection_lowMPR, axis=0), axis=0)
+        matrix_resection_highMPR = [resection_highMPR_samples[sample]['matrix'] for sample in resection_highMPR_samples.keys()]
+        mean_matrix_resection_highMPR = np.mean(np.stack(matrix_resection_highMPR, axis=0), axis=0)
+
+        # Plot heatmaps
+        diff_biopsies = mean_matrix_biopsy_highMPR - mean_matrix_biopsy_lowMPR
+        plt.figure(figsize=(20,15))
+        sns.heatmap(diff_biopsies, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Difference in average interaction matrix in Biopsies (High MPR - Low MPR)')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'interaction_matrices/difference_biopsies_interaction_matrix.svg'), format='svg', bbox_inches='tight')
+        plt.close()
+
+        diff_resections = mean_matrix_resection_highMPR - mean_matrix_resection_lowMPR
+        plt.figure(figsize=(20,15))
+        sns.heatmap(diff_resections, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Difference in average interaction matrix in Resections (High MPR - Low MPR)')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'interaction_matrices/difference_resections_interaction_matrix.svg'), format='svg', bbox_inches='tight')
+        plt.close()
+
+        diff_lowMPR = mean_matrix_resection_lowMPR - mean_matrix_biopsy_lowMPR
+        plt.figure(figsize=(20,15))
+        sns.heatmap(diff_lowMPR, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Difference in average interaction matrix in Low MPR samples (Resection - Biopsy)')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'interaction_matrices/difference_lowMPR_interaction_matrix.svg'), format='svg', bbox_inches='tight')
+        plt.close()
+
+        diff_highMPR = mean_matrix_resection_highMPR - mean_matrix_biopsy_highMPR
+        plt.figure(figsize=(20,15))
+        sns.heatmap(diff_highMPR, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Difference in average interaction matrix in High MPR samples (Resection - Biopsy)')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'interaction_matrices/difference_highMPR_interaction_matrix.svg'), format='svg', bbox_inches='tight')
+        plt.close() 
+
+
+
+def stat_analysis_heatmaps(input_file, analysis, output_dir_plots, category, cell_types):
+    # Heatmaps for 
+    #------------------------------------------------------------------------------
+    name_of_analysis = 'neighborhood_enrichment' if analysis=='zscore' else 'interaction_matrix'
+    os.makedirs(os.path.join(output_dir_plots, name_of_analysis), exist_ok=True)
+    biopsy_samples = {}
+    resection_samples = {}
+    for sample in input_file.keys():
+        if input_file[sample]['sample_type']=='Biopsy':
+            biopsy_samples[sample] = input_file[sample]
+        elif input_file[sample]['sample_type']=='Resection':
+            resection_samples[sample] = input_file[sample]
+    
+    biopsy_lowMPR_samples = {}
+    biopsy_highMPR_samples = {}
+    resection_lowMPR_samples = {}
+    resection_highMPR_samples = {}
+    for sample in input_file.keys():
+        if input_file[sample]['sample_type']=='Biopsy' and input_file[sample]['MPR']=='<90':
+            biopsy_lowMPR_samples[sample] = input_file[sample]
+        elif input_file[sample]['sample_type']=='Biopsy' and input_file[sample]['MPR']=='>=90':
+            biopsy_highMPR_samples[sample] = input_file[sample]
+        elif input_file[sample]['sample_type']=='Resection' and input_file[sample]['MPR']=='<90':
+            resection_lowMPR_samples[sample] = input_file[sample]
+        elif input_file[sample]['sample_type']=='Resection' and input_file[sample]['MPR']=='>=90':
+            resection_highMPR_samples[sample] = input_file[sample]
+
+    if category == None:
+        matrix_biopsy = [biopsy_samples[sample][analysis] for sample in biopsy_samples.keys()]
+        matrix_resection = [resection_samples[sample][analysis] for sample in resection_samples.keys()]
+        mean_matrix_biopsy = np.mean(np.stack(matrix_biopsy, axis=0), axis=0)
+        mean_matrix_resection = np.mean(np.stack(matrix_resection, axis=0), axis=0)
+        diff_matrix = mean_matrix_resection - mean_matrix_biopsy
+
+        plt.figure(figsize=(20,15))
+        sns.heatmap(diff_matrix, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+        plt.title(f'Difference in {name_of_analysis} - Resection - Biopsy')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir_plots, f'{name_of_analysis}/difference_{name_of_analysis}.svg'), format='svg', bbox_inches='tight')
+        plt.close()
+
+    elif category != None:
+        list_tuples = [('Biopsy', biopsy_highMPR_samples, biopsy_lowMPR_samples),
+                       ('Resection', resection_highMPR_samples, resection_lowMPR_samples),
+                       ('Low MPR', resection_lowMPR_samples, biopsy_lowMPR_samples),
+                       ('High MPR', resection_highMPR_samples, biopsy_highMPR_samples)]
+        for group_name, g1_samples, g2_samples in list_tuples:
+            matrix_g1 = [g1_samples[sample][analysis] for sample in g1_samples.keys()]
+            mean_matrix_g1 = np.mean(np.stack(matrix_g1, axis=0), axis=0)
+            matrix_g2 = [g2_samples[sample][analysis] for sample in g2_samples.keys()]
+            mean_matrix_g2 = np.mean(np.stack(matrix_g2, axis=0), axis=0)
+            diff_matrix = mean_matrix_g1 - mean_matrix_g2
+
+            plt.figure(figsize=(20,15))
+            sns.heatmap(diff_matrix, cmap='vlag', center=0, xticklabels=cell_types, yticklabels=cell_types)
+            plt.title(f'Difference in {name_of_analysis} - {group_name}')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir_plots, f'{name_of_analysis}/difference_{name_of_analysis}_{group_name.replace(" ", "_")}.svg'), format='svg', bbox_inches='tight')
+            plt.close()
 
 
 
@@ -194,7 +326,7 @@ centrality_scores_path = os.path.join(input_dir, 'combined_centrality_scores.pkl
 with open(centrality_scores_path, 'rb') as f:
     centrality_scores = pickle.load(f)
 cell_types = centrality_scores['degree_centrality'].columns.tolist()
-#stat_analysis_centrality_scores(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, category=None)
+stat_analysis_centrality_scores(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, category=None)
 
 nhood_enrichment_path = os.path.join(input_dir, 'combined_neighbors_enrichment.pkl')
 with open(nhood_enrichment_path, 'rb') as f:
@@ -205,8 +337,16 @@ with open(nhood_enrichment_path, 'rb') as f:
 interaction_matrix_path = os.path.join(input_dir, 'combined_interaction_matrix.pkl')
 with open(interaction_matrix_path, 'rb') as f:
     interaction_matrices = pickle.load(f)
-stat_analysis_interaction_matrices(input_file=interaction_matrices, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, category=None, cell_types=cell_types)
+#stat_analysis_interaction_matrices(input_file=interaction_matrices, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, category=None, cell_types=cell_types)
 
+analyses = ['zscore', 'matrix']
+categories = [None, 'MPR']
+for analysis in analyses:
+    for category in categories:
+        stat_analysis_heatmaps(input_file=nhood_enrichment, analysis=analysis, output_dir_plots=output_dir_plots, category=category, cell_types=cell_types)
 
-
-
+        
+#stat_analysis_heatmaps(input_file=nhood_enrichment, analysis='matrix', output_dir_plots=output_dir_plots, category=None, cell_types=cell_types)
+#stat_analysis_heatmaps(input_file=nhood_enrichment, analysis='matrix', output_dir_plots=output_dir_plots, category=None, cell_types=cell_types)
+#stat_analysis_heatmaps(input_file=nhood_enrichment, analysis='matrix', output_dir_plots=output_dir_plots, category=None, cell_types=cell_types)
+#stat_analysis_heatmaps(input_file=nhood_enrichment, analysis='matrix', output_dir_plots=output_dir_plots, category=None, cell_types=cell_types)
