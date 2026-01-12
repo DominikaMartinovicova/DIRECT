@@ -33,6 +33,12 @@ def preprocess_adata(adata_path, exclude_v17=True,phenotyping_level=None):
     adata.obs['MPR'] = np.where(reg < 90.0,"<90",">=90")
     print(adata)
     adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad")
+
+    # Savecell type list
+    print('Saving cell type list...')
+    celltype_list = sorted(adata.obs[phenotyping_level].unique().tolist())
+    pd.Series(celltype_list).to_csv(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_celltype_list.txt", index=False, header=False)
+    print(celltype_list)
     print('Preprocessing done.')
     samples_list = adata.obs['sample'].unique().tolist()
     return samples_list, adata
