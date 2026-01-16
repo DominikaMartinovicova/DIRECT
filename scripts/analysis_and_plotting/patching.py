@@ -35,8 +35,7 @@ import os
 import pickle
 import argparse
 import warnings
-warnings.simplefilter("ignore", FutureWarning)
-warnings.simplefilter("ignore", PerformanceWarning)
+warnings.filterwarnings("ignore")
 
 # Parse arguments from commandline
 #--------------------------------------------------------------------------------
@@ -77,29 +76,31 @@ adata = sc.read_h5ad(args.input)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Divide each piece of tissue into patches
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-sq.tl.sliding_window(adata=adata,library_key="sample", window_size=args.patch_size, overlap=args.overlap,copy=False)
+print('Dividing each piece of tissue into patches...')
+sq.tl.sliding_window(adata=adata, library_key="sample", window_size=args.patch_size, sliding_window_key='patch')#, overlap=args.overlap, copy=False)
+adata.obs['patch'] = adata.obs['patch'].astype('category')  # Convert to categorical
+print('Writing adata with sliding window assignment...')
+adata.write_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/Neutro_Epi_extImm_pooled_A_EM_N_combined_adatas_w_patches.h5ad')
 
-sq.pl.spatial_scatter(adata, color="sliding_window_assignment", library_key="sample")
-plt.savefig(os.path.join(args.output_dir_plots,'spatial_scatter_sliding_window_assignment.png'))
-plt.close()
-
-sample="T23_004535_110005_1"
-sq.pl.spatial_scatter(adata,color="sliding_window_assignment",library_key="sample",library_id=[sample],figsize=(10, 10))
-plt.savefig(os.path.join(args.output_dir_plots,f'spatial_scatter_sliding_window_assignment_{sample}.png'))
+# Plot spatial scatter with patches
+print('Plotting spatial scatter with patches...')
+sq.pl.spatial_scatter(adata, color="pt_id", library_id="spatial", shape=None)
+plt.legend().remove()
+plt.savefig(os.path.join(args.output_dir_plots,'spatial_scatter_patches.png'))
 plt.close()
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 3 Create patch adata (patches as observations)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-patches = adata.obs['sliding_window_assignment'].unique()
+patches = adata.obs['patch'].unique()
 print(f'Total number of patches: {len(patches)}')
 
 # Remove patches with too few cells
 #--------------------------------------------------------------------------------
 patches_to_keep = []
 for patch in patches:
-    adata_patch = adata[adata.obs['sliding_window_assignment']==patch]
+    adata_patch = adata[adata.obs['patch']==patch]
     number_of_cells = adata_patch.n_obs
     if number_of_cells > 20:
         patches_to_keep.append(patch)
@@ -112,12 +113,13 @@ X_patch_list = []
 obs_patch_list = []
 
 for patch in patches_to_keep:
-    index = adata.obs['sliding_window_assignment']==patch   # Find cells belonging to the same patch
-    X_patch_list.append(adata.raw[index].mean(axis=0))        # For each patch get mean expression of all genes across all cells in the patch
+    index = (adata.obs['patch']==patch).to_numpy()   # Find cells belonging to the same patch
+    X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0))        # For each patch get mean expression of all genes across all cells in the patch
     obs_patch_list.append(adata.obs[index].iloc[0])         # For each patch get obs info from the first cell in the patch
 
 X_patch = np.vstack(X_patch_list)
 adata_patches_gex = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=adata.var.copy())
+adata_patches_gex.obs["patch"] = adata_patches_gex.obs["patch"].astype("category")
 
 # Normalize and log-transform
 print('Normalizing and log-transforming...')
@@ -130,7 +132,8 @@ print('Dimension reduction...')
 sc.pp.pca(adata_patches_gex)
 sc.pp.neighbors(adata_patches_gex, n_neighbors=16)
 sc.tl.umap(adata_patches_gex)
-sc.pl.umap(adata_patches_gex, color='sliding_window_assignment', show=False, size=5)
+sc.pl.umap(adata_patches_gex, color='pt_id', show=False, size=5)
+plt.legend().remove()
 plt.savefig(os.path.join(args.output_dir_plots,'umap_patches_gex.png'), dpi=300, bbox_inches='tight')
 plt.close()
 
@@ -141,7 +144,7 @@ X_patch_list = []
 obs_patch_list = []
 
 for patch in patches_to_keep:
-    index = adata.obs['sliding_window_assignment']==patch   # Find cells belonging to the same patch
+    index = (adata.obs['patch']==patch).to_numpy()   # Find cells belonging to the same patch
     ct_counts = adata.obs[index]['Neutro_Epi_extImm_pooled_A_EM_N'].value_counts(normalize=True)  # For each patch get cell type fractions
     ct_fractions = ct_counts.reindex(adata.obs['Neutro_Epi_extImm_pooled_A_EM_N'].cat.categories, fill_value=0).values  # Ensure all cell types are represented in the same order
     X_patch_list.append(ct_fractions)
@@ -149,6 +152,8 @@ for patch in patches_to_keep:
 
 X_patch = np.vstack(X_patch_list)
 adata_patches_ct = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=pd.DataFrame(index=adata.obs['Neutro_Epi_extImm_pooled_A_EM_N'].cat.categories))
+adata_patches_ct.obs["patch"] = adata_patches_ct.obs["patch"].astype("category")
+print(adata_patches_ct)
 
 # Normalize and log-transform
 print('Normalizing and log-transforming...')
@@ -161,7 +166,8 @@ print('Dimension reduction...')
 sc.pp.pca(adata_patches_ct)
 sc.pp.neighbors(adata_patches_ct, n_neighbors=16)
 sc.tl.umap(adata_patches_ct)
-sc.pl.umap(adata_patches_ct, color='sliding_window_assignment', show=False, size=5)
+sc.pl.umap(adata_patches_ct, color='pt_id', show=False, size=5)
+plt.legend().remove()
 plt.savefig(os.path.join(args.output_dir_plots,'umap_patches_ctFraction.png'), dpi=300, bbox_inches='tight')
 plt.close()
 
@@ -170,8 +176,8 @@ plt.close()
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 for patch in patches_to_keep:
     # Gene expression adata
-    adata_patch = adata[adata.obs['sliding_window_assignment']==patch]
-    adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'adata_patch_{patch}.h5ad'))
+    adata_patch = adata[adata.obs['patch']==patch]
+    adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'adata_{patch}.h5ad'))
 
 print('Done.')
 
