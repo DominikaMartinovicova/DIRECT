@@ -1,0 +1,175 @@
+
+from scripts.analysis_and_plotting.utils import *
+import glob
+from snakemake.io import expand, dynamic
+
+def get_patches(wildcards):
+    ckpts = checkpoints.patching.get()
+    patch_files = glob.glob(f'{ckpts.output.patches_adata_dir}/adata_*.h5ad')
+    return [file.split('/')[-1].replace('adata_', '').replace('.h5ad','') for file in patch_files]
+
+def spatial_targets(wildcards):
+    return expand(output_dir_results + 'spatial/{patch}/centrality_scores.csv',
+                  patch=get_patches(wildcards))
+
+#+++++++++++++++++++++++++++++++++++++++ 0 PREPARE WILDCARDS AND TARGET ++++++++++++++++++++++++++++++++++++++++++++
+# Prepare wildcards and variables
+#-------------------------------------------------------------------------------------------------------------------
+data_dir = 'data/'
+log_dir = 'logs/analysis/'
+exclude_v17 = True
+phenotyping_level = 'Neutro_Epi_extImm_pooled_A_EM_N'
+adata_path = data_dir + f"combined/{phenotyping_level}_combined_adatas.h5ad"
+#samples_list, adata = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
+#save_per_sample_adata(adata, output_dir=data_dir + f'per_sample/{phenotyping_level}/')
+#sample_dict = get_sample_dict(adata)
+output_dir_results = f'results/analysis/{phenotyping_level}/'
+output_dir_plots = f'plots/analysis/{phenotyping_level}/'
+
+# Specify target rules
+#-------------------------------------------------------------------------------------------------------------------
+rule all:
+    input:
+        spatial_targets
+
+#+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
+# Divide each piece of tissue into smaller regions (patches) and analyze them separately
+#-------------------------------------------------------------------------------------------------------------------
+checkpoint patching:
+    input:
+        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad"
+    output:
+        patches_adata_dir = directory(data_dir + f'patches_per_sample/{phenotyping_level}/')
+    params:
+        patch_size = 5000,  # in microns
+        overlap = 50,       # in microns
+        plots_dir = output_dir_plots + 'spatial/patching/'
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/patching.py \
+        -i {input.adata} \
+        --patch_size {params.patch_size} \
+        --overlap {params.overlap} \
+        -o {output.patches_adata_dir} \
+        --plots_dir {params.plots_dir} \
+        """
+
+
+# Spatial analysis per patch
+#-------------------------------------------------------------------------------------------------------------------
+rule spatial_analysis_per_patch:
+    input:
+        adata_patch_subset = data_dir + f'patches_per_sample/{phenotyping_level}/adata_{{patch}}.h5ad'
+    output:
+        centrality_scores = output_dir_results + 'spatial/{patch}/centrality_scores.csv',
+        nhood_enrichment = output_dir_results + "spatial/{patch}/neighbors_enrichment.pkl",
+        interaction_matrix = output_dir_results + "spatial/{patch}/interaction_matrix.pkl",
+        co_occurrence = output_dir_results + "spatial/{patch}/co_occurrence_probabilities.pkl"
+    params:
+        celltype_key = phenotyping_level,
+        celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt"
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/spatial_analysis.py \
+        -i {input.adata_patch_subset} \
+        --celltype_key {params.celltype_key} \
+        --celltype_list {params.celltype_list} \
+        -o_results {output_dir_results}/spatial/{wildcards.patch}/ \
+        -o_plots {output_dir_plots}/spatial/{wildcards.patch}/ \
+        """
+
+
+
+
+
+
+
+
+# # Spatial analysis per sample
+# #-------------------------------------------------------------------------------------------------------------------
+# rule spatial_analysis_per_sample:
+#     input:
+#         adata_sample_subset = data_dir + f'per_sample/{phenotyping_level}/{{sample}}_adata.h5ad'
+#     output:
+#         centrality_scores = output_dir_results + 'spatial/{sample}/centrality_scores.csv',
+#         nhood_enrichment = output_dir_results + "spatial/{sample}/neighbors_enrichment.pkl",
+#         interaction_matrix = output_dir_results + "spatial/{sample}/interaction_matrix.pkl",
+#         co_occurrence = output_dir_results + "spatial/{sample}/co_occurrence_probabilities.pkl"
+#     params:
+#         celltype_key = phenotyping_level,
+#         celltype_list = f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_celltype_list.txt"
+#     #conda:
+#     #    "xenium_py310"
+#     shell:
+#         """
+#         python3 scripts/analysis_and_plotting/spatial_analysis.py \
+#         -i {input.adata_sample_subset} \
+#         --celltype_key {params.celltype_key} \
+#         --celltype_list {params.celltype_list} \
+#         -o_results {output_dir_results}/spatial/{wildcards.sample}/ \
+#         -o_plots {output_dir_plots}/spatial/{wildcards.sample}/ \
+#         """
+
+
+# # Combine spatial analysis results 
+# #-------------------------------------------------------------------------------------------------------------------
+# rule combine_spatial_analysis_results:
+#     input:
+#         centrality_scores = expand(output_dir_results + "spatial/{sample}/centrality_scores.csv", sample=samples_list),
+#         nhood_enrichment = expand(output_dir_results + "spatial/{sample}/neighbors_enrichment.pkl", sample=samples_list),
+#         interaction_matrix = expand(output_dir_results + "spatial/{sample}/interaction_matrix.pkl", sample=samples_list),
+#         co_occurrence = expand(output_dir_results + "spatial/{sample}/co_occurrence_probabilities.pkl", sample=samples_list)
+#     output:
+#         combined_centrality_scores = output_dir_results + 'spatial/combined/combined_centrality_scores.pkl',
+#         combined_nhood_enrichment = output_dir_results + "spatial/combined/combined_neighbors_enrichment.pkl",
+#         combined_interaction_matrix = output_dir_results + "spatial/combined/combined_interaction_matrix.pkl",
+#         combined_co_occurrence = output_dir_results + "spatial/combined/combined_cooccurrence_probabilities.pkl"
+#     params:
+#         samples_list = ",".join(samples_list),
+#         adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad",
+#         in_dir = output_dir_results + 'spatial/',
+#         out_dir_results = output_dir_results + 'spatial/combined/',
+#         out_dir_plots = output_dir_plots + 'spatial/combined/'
+#     #conda:
+#     #    "xenium_py310"
+#     shell:
+#         """
+#         python3 scripts/analysis_and_plotting/combine_spatial_results.py \
+#         -i {params.in_dir} \
+#         --samples_list {params.samples_list} \
+#         --adata {params.adata_path} \
+#         -o_results {params.out_dir_results} \
+#         -o_plots {params.out_dir_plots} \
+#         """
+
+# rule stat_analysis_spatial_results:
+#     input:
+#         combined_centrality_scores = output_dir_results + 'spatial/combined/combined_centrality_scores.pkl',
+#         combined_nhood_enrichment = output_dir_results + "spatial/combined/combined_neighbors_enrichment.pkl",
+#         combined_interaction_matrix = output_dir_results + "spatial/combined/combined_interaction_matrix.pkl",
+#         combined_co_occurrence = output_dir_results + "spatial/combined/combined_cooccurrence_probabilities.pkl"
+#     output:
+#         stats_report = output_dir_results + 'spatial/combined/spatial_stats_report.txt'
+#     params:
+#         in_dir = output_dir_results + 'spatial/combined/',
+#         out_dir_plots = output_dir_plots + 'spatial/combined/',
+#         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt"
+#     #conda:
+#     #    "xenium_py310"
+#     shell:
+#         """
+#         python3 scripts/analysis_and_plotting/stat_analysis_spatial_results.py \
+#         -i {params.in_dir} \
+#         --celltype_list {params.celltype_list} \
+#         -o_plots {params.out_dir_plots} \
+#         -o_report {output.stats_report} \
+#         """
+
+
+
+
+

@@ -11,7 +11,9 @@
 !*.ipynb
 
 # Include the Snakefile
-!Snakefile
+!Snakefile_analysis
+!Snakefile_preprocessing
+!Snakefile_*
 
 # Include sbatch/job submission files
 !*.sbatch
