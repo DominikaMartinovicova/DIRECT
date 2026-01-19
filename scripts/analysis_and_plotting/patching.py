@@ -118,6 +118,7 @@ if overlap == 0:
         number_of_cells = adata_patch.n_obs
         if number_of_cells > 20:
             patches_to_keep.append(patch)
+            adata_patch.obs.drop(columns=patch_cols, inplace=True)
             adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'{patch}.h5ad'))
     print(f'Number of patches after filtering for min number of cells (>20): {len(patches_to_keep)}')
 
@@ -168,6 +169,7 @@ elif overlap > 0:
         number_of_cells = adata_patch.n_obs
         if number_of_cells > 20:
             patches_to_keep.append(patch)
+            adata_patch.obs.drop(columns=patch_cols, inplace=True)
             adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'{patch}.h5ad'))
     print(f'Number of patches after filtering for min number of cells (>20): {len(patches_to_keep)}')
 

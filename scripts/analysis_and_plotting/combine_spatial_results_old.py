@@ -48,15 +48,16 @@ def parse_args():
     parser.add_argument('-o_plots', help='path to output dir for plots',
                         dest='output_dir_plots',
                         type=str)
-    # parser.add_argument('--samples_list', help='list of samples to combine',
-    #                     dest='samples_list',
-    #                     type=str)
+    parser.add_argument('--samples_list', help='list of samples to combine',
+                        dest='samples_list',
+                        type=str)
     args = parser.parse_args()
     return args
 
 args = parse_args()
 
 
+samples_list = args.samples_list.split(",")
 output_dir_results=args.output_dir_results
 output_dir_plots=args.output_dir_plots
 os.makedirs(output_dir_results, exist_ok=True)
@@ -68,41 +69,40 @@ os.makedirs(output_dir_plots, exist_ok=True)
 # Create a dataframe with sample information
 #--------------------------------------------------------------------------------
 adata = sc.read_h5ad(args.adata)
-patch_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme",'patch']].drop_duplicates().set_index('patch')
-print(patch_info)
-patches_list = patch_info.index.str.replace('patch_','').tolist()  #list of patches to combine
+sample_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme"]].drop_duplicates().set_index('sample')
+print(sample_info)
 
 # Create a dictionary for each analysis
 #--------------------------------------------------------------------------------
 list_dir = []
-for patch in patches_list:
-    list_dir.append(args.input + patch + "/")  #list of directories with analyses results per sample
+for sample in samples_list:
+    list_dir.append(args.input + sample + "/")  #list of directories with analyses results per sample
 
 # Create dictionaries of results for each analysis
 centrality_results={}
 nhood_results={}
 interaction_results={}
 cooccurrence_results={}
-for i, patch_dir in enumerate(list_dir):   # Loop over all folders and files in the directory
+for i, sample_dir in enumerate(list_dir):   # Loop over all folders and files in the directory
     #print(sample_dir)
-    patch = patch_dir.split("/")[-2]
+    sample = sample_dir.split("/")[-2]
     #print("Reading results from " + sample)
-    for file in os.listdir(patch_dir):
+    for file in os.listdir(sample_dir):
         if file.endswith("centrality_scores.csv"):
-            file = pd.read_csv(os.path.join(patch_dir, file), index_col=0)
-            centrality_results[patch] = file
+            file = pd.read_csv(os.path.join(sample_dir, file), index_col=0)
+            centrality_results[sample] = file
         elif file.endswith("neighbors_enrichment.pkl"):
-            with open(os.path.join(patch_dir, file), 'rb') as f:
+            with open(os.path.join(sample_dir, file), 'rb') as f:
                 file = pickle.load(f)
-            nhood_results[patch] = file
+            nhood_results[sample] = file
         elif file.endswith("interaction_matrix.pkl"):
-            with open(os.path.join(patch_dir, file), 'rb') as f:
+            with open(os.path.join(sample_dir, file), 'rb') as f:
                 file = pickle.load(f)
-            interaction_results[patch] = file  
+            interaction_results[sample] = file  
         elif file.endswith("co_occurrence_probabilities.pkl"):
-            with open(os.path.join(patch_dir, file), 'rb') as f:
+            with open(os.path.join(sample_dir, file), 'rb') as f:
                 file = pickle.load(f)
-            cooccurrence_results[patch] = file
+            cooccurrence_results[sample] = file
         else:
             print(f"Skipping over {file}")
 
@@ -123,26 +123,26 @@ degree_centrality_scores = pd.DataFrame()
 average_clustering_scores = pd.DataFrame()
 closeness_centrality_scores = pd.DataFrame()
 
-for patch in centrality_results.keys():
-    for analysis in centrality_results[patch].columns:
+for sample in centrality_results.keys():
+    for analysis in centrality_results[sample].columns:
         if analysis == 'degree_centrality':
-            degree_centrality_scores[patch] = centrality_results[patch][analysis]
+            degree_centrality_scores[sample] = centrality_results[sample][analysis]
         elif analysis == 'average_clustering':
-            average_clustering_scores[patch] = centrality_results[patch][analysis]
+            average_clustering_scores[sample] = centrality_results[sample][analysis]
         elif analysis == 'closeness_centrality':
-            closeness_centrality_scores[patch] = centrality_results[patch][analysis]
+            closeness_centrality_scores[sample] = centrality_results[sample][analysis]
         else:
             print(f'Unknown analysis type: {analysis}')
 
 # Add sample info
 degree_centrality_scores = degree_centrality_scores.transpose()
-degree_centrality_scores = degree_centrality_scores.join(patch_info[['sample_type', 'MPR']], how='left')
+degree_centrality_scores = degree_centrality_scores.join(sample_info[['sample_type', 'MPR']], how='left')
 
 average_clustering_scores = average_clustering_scores.transpose()
-average_clustering_scores = average_clustering_scores.join(patch_info[['sample_type', 'MPR']], how='left')
+average_clustering_scores = average_clustering_scores.join(sample_info[['sample_type', 'MPR']], how='left')
 
 closeness_centrality_scores = closeness_centrality_scores.transpose()
-closeness_centrality_scores = closeness_centrality_scores.join(patch_info[['sample_type', 'MPR']], how='left')
+closeness_centrality_scores = closeness_centrality_scores.join(sample_info[['sample_type', 'MPR']], how='left')
 
 combined_centrality_scores = {'degree_centrality': degree_centrality_scores,'average_clustering': average_clustering_scores,'closeness_centrality': closeness_centrality_scores}
 with open(os.path.join(output_dir_results, 'combined_centrality_scores.pkl'), 'wb') as f:
@@ -152,10 +152,10 @@ with open(os.path.join(output_dir_results, 'combined_centrality_scores.pkl'), 'w
 #--------------------------------------------------------------------------------
 print('Combining neighborhood enrichments...')
 combined_nhood_enrichment = {}
-for patch in nhood_results.keys():
-    combined_nhood_enrichment[patch] = nhood_results[patch]
-    combined_nhood_enrichment[patch]['sample_type'] = patch_info.loc[patch, 'sample_type']
-    combined_nhood_enrichment[patch]['MPR'] = patch_info.loc[patch, 'MPR']
+for sample in nhood_results.keys():
+    combined_nhood_enrichment[sample] = nhood_results[sample]
+    combined_nhood_enrichment[sample]['sample_type'] = sample_info.loc[sample, 'sample_type']
+    combined_nhood_enrichment[sample]['MPR'] = sample_info.loc[sample, 'MPR']
 #print(combined_nhood_enrichment)
 with open(os.path.join(output_dir_results, 'combined_neighbors_enrichment.pkl'), 'wb') as f:
     pickle.dump(combined_nhood_enrichment, f)
@@ -164,10 +164,10 @@ with open(os.path.join(output_dir_results, 'combined_neighbors_enrichment.pkl'),
 #--------------------------------------------------------------------------------
 print('Combining interaction matrices...')
 combined_interaction_matrices = {}
-for patch in interaction_results.keys():
-    combined_interaction_matrices[patch] = {'matrix': interaction_results[patch],
-                                             'sample_type': patch_info.loc[patch, 'sample_type'],
-                                             'MPR': patch_info.loc[patch, 'MPR']}
+for sample in interaction_results.keys():
+    combined_interaction_matrices[sample] = {'matrix': interaction_results[sample],
+                                             'sample_type': sample_info.loc[sample, 'sample_type'],
+                                             'MPR': sample_info.loc[sample, 'MPR']}
 #print(combined_interaction_matrices)
 with open(os.path.join(output_dir_results, 'combined_interaction_matrix.pkl'), 'wb') as f:
     pickle.dump(combined_interaction_matrices, f)
@@ -176,10 +176,10 @@ with open(os.path.join(output_dir_results, 'combined_interaction_matrix.pkl'), '
 #--------------------------------------------------------------------------------
 print('Combining co-occurrence probabilities...')
 combined_cooccurrence_probs={}
-for patch in cooccurrence_results.keys():
-    combined_cooccurrence_probs[patch] = cooccurrence_results[patch]
-    combined_cooccurrence_probs[patch]['sample_type'] = patch_info.loc[patch, 'sample_type']
-    combined_cooccurrence_probs[patch]['MPR'] = patch_info.loc[patch, 'MPR']
+for sample in cooccurrence_results.keys():
+    combined_cooccurrence_probs[sample] = cooccurrence_results[sample]
+    combined_cooccurrence_probs[sample]['sample_type'] = sample_info.loc[sample, 'sample_type']
+    combined_cooccurrence_probs[sample]['MPR'] = sample_info.loc[sample, 'MPR']
 #print(combined_cooccurrence_probs)
 with open(os.path.join(output_dir_results, 'combined_cooccurrence_probabilities.pkl'), 'wb') as f:
     pickle.dump(combined_cooccurrence_probs, f)
