@@ -129,7 +129,7 @@ if overlap == 0:
 
     for patch in patches_to_keep:
         index = (adata.obs['patch']==patch).to_numpy()   # Find cells belonging to the same patch
-        X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0))        # For each patch get mean expression of all genes across all cells in the patch
+        X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0).A1)        # For each patch get mean expression of all genes across all cells in the patch
         obs_patch_list.append(adata.obs[index].iloc[0])         # For each patch get obs info from the first cell in the patch
 
     X_patch = np.vstack(X_patch_list)
@@ -156,7 +156,7 @@ if overlap == 0:
     print(adata_patches_ct)
 
 elif overlap > 0:
-    print('Patches are overlapping. Patch size:', args.patch_size, 'Overlap:', overlap)
+    print('Patches are overlapping. Patch size:', p_size, 'Overlap:', overlap)
     patches = adata.obs.columns[adata.obs.columns.str.contains("patch")]
     print(f'Total number of patches: {len(patches)}')
     
@@ -179,8 +179,10 @@ elif overlap > 0:
 
     for patch in patches_to_keep:
         index = adata.obs[patch].values   # Find cells belonging to the same patch
-        X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0))        # For each patch get mean expression of all genes across all cells in the patch
-        obs_patch_list.append(adata.obs[index].iloc[0].assign(patch=patch))         # For each patch get obs info from the first cell in the patch
+        X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0).A1)        # For each patch get mean expression of all genes across all cells in the patch
+        obs_patch_tmp = adata.obs[index].iloc[0].copy()
+        obs_patch_tmp['patch'] = patch
+        obs_patch_list.append(obs_patch_tmp)         # For each patch get obs info from the first cell in the patch
 
     X_patch = np.vstack(X_patch_list)
     adata_patches_gex = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=adata.var.copy())
@@ -199,7 +201,9 @@ elif overlap > 0:
         ct_counts = adata.obs[index][celltype_key].value_counts(normalize=True)  # For each patch get cell type fractions
         ct_fractions = ct_counts.reindex(adata.obs[celltype_key].cat.categories, fill_value=0).values  # Ensure all cell types are represented in the same order
         X_patch_list.append(ct_fractions)
-        obs_patch_list.append(adata.obs[index].iloc[0].assign(patch=patch))         # For each patch get obs info from the first cell in the patch
+        obs_patch_tmp = adata.obs[index].iloc[0].copy()
+        obs_patch_tmp['patch'] = patch
+        obs_patch_list.append(obs_patch_tmp)         # For each patch get obs info from the first cell in the patch
 
     X_patch = np.vstack(X_patch_list)
     adata_patches_ct = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=pd.DataFrame(index=adata.obs[celltype_key].cat.categories))
@@ -207,7 +211,10 @@ elif overlap > 0:
     adata_patches_ct.obs.drop(columns=patch_cols, inplace=True)
     print(adata_patches_ct)
 
-
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 4 Plot patches adatas in umap space
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+print('Plotting patches adatas in umap space...')
 for adata, suffix in [(adata_patches_gex, 'gex'), (adata_patches_ct, 'ctFraction')]:
     # Normalize and log-transform
     print('Normalizing and log-transforming...')
@@ -224,6 +231,8 @@ for adata, suffix in [(adata_patches_gex, 'gex'), (adata_patches_ct, 'ctFraction
     plt.legend().remove()
     plt.savefig(os.path.join(args.output_dir_plots,f'umap_patches_{suffix}.png'), dpi=300, bbox_inches='tight')
     plt.close()
+
+    adata.write_h5ad(os.path.join(args.output_dir_patches,f'adata_patches_{suffix}.h5ad'))
 
 
 print('Done.')

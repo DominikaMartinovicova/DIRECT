@@ -5,8 +5,8 @@ from snakemake.io import expand, dynamic
 
 def get_patches(wildcards):
     ckpts = checkpoints.patching.get()
-    patch_files = glob.glob(f'{ckpts.output.patches_adata_dir}/adata_*.h5ad')
-    return [file.split('/')[-1].replace('adata_', '').replace('.h5ad','') for file in patch_files]
+    patch_files = glob.glob(f'{ckpts.output.patches_adata_dir}/patch_*.h5ad')
+    return [file.split('/')[-1].replace('patch_', '').replace('.h5ad','') for file in patch_files]
 
 def spatial_targets(wildcards):
     return expand(output_dir_results + 'spatial/{patch}/centrality_scores.csv',
@@ -25,7 +25,7 @@ adata_path = data_dir + f"combined/{phenotyping_level}_combined_adatas.h5ad"
 #sample_dict = get_sample_dict(adata)
 output_dir_results = f'results/analysis/{phenotyping_level}/'
 output_dir_plots = f'plots/analysis/{phenotyping_level}/'
-patch_size = 2000  # in microns
+patch_size = 200  # in microns
 overlap = 50       # in microns
 # Specify target rules
 #-------------------------------------------------------------------------------------------------------------------
@@ -44,7 +44,8 @@ checkpoint patching:
     params:
         patch_size = patch_size,
         overlap = overlap,
-        plots_dir = output_dir_plots + f'spatial/patching/{patch_size}um_{overlap}um/'
+        plots_dir = output_dir_plots + f'spatial/patching/{patch_size}um_{overlap}um/',
+        celltype_key = phenotyping_level
     #conda:
     #    "xenium_py310"
     shell:
@@ -53,6 +54,7 @@ checkpoint patching:
         -i {input.adata} \
         --patch_size {params.patch_size} \
         --overlap {params.overlap} \
+        --celltype_key {params.celltype_key} \
         -o {output.patches_adata_dir} \
         --plots_dir {params.plots_dir} \
         """
@@ -62,7 +64,7 @@ checkpoint patching:
 #-------------------------------------------------------------------------------------------------------------------
 rule spatial_analysis_per_patch:
     input:
-        adata_patch_subset = data_dir + f'adata_per_patch/{phenotyping_level}/adata_{{patch}}.h5ad'
+        adata_patch_subset = data_dir + f'adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/patch_{{patch}}.h5ad'
     output:
         centrality_scores = output_dir_results + 'spatial/{patch}/centrality_scores.csv',
         nhood_enrichment = output_dir_results + "spatial/{patch}/neighbors_enrichment.pkl",
@@ -83,7 +85,9 @@ rule spatial_analysis_per_patch:
         -o_plots {output_dir_plots}/spatial/{wildcards.patch}/ \
         """
 
-
+rule make adata_spat_analysis_per_patch:
+    input:
+        spatial_analysis_per_patch
 
 
 
