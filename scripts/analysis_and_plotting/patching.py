@@ -53,6 +53,9 @@ def parse_args():
     parser.add_argument('--overlap', help='overlap between patches in microns',
                         dest='overlap',
                         type=int)
+    parser.add_argument('--celltype_key', help='key for cell type annotation in adata.obs',
+                        dest='celltype_key',
+                        type=str)
     parser.add_argument('-o', '--output_patches', help='path to output dir with patches per sample',
                         dest='output_dir_patches',
                         type=str)
@@ -63,6 +66,9 @@ def parse_args():
     return args
 
 args = parse_args()
+overlap = args.overlap
+p_size = args.patch_size
+celltype_key = args.celltype_key
 os.makedirs(args.output_dir_patches, exist_ok=True)
 os.makedirs(args.output_dir_plots, exist_ok=True)
 
@@ -77,107 +83,148 @@ adata = sc.read_h5ad(args.input)
 # 2 Divide each piece of tissue into patches
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 print('Dividing each piece of tissue into patches...')
-sq.tl.sliding_window(adata=adata, library_key="sample", window_size=args.patch_size, sliding_window_key='patch')#, overlap=args.overlap, copy=False)
-adata.obs['patch'] = adata.obs['patch'].astype('category')  # Convert to categorical
+sq.tl.sliding_window(adata=adata, library_key="sample", window_size=p_size, sliding_window_key='patch', overlap=overlap, copy=False)
+if overlap == 0:
+    adata.obs['patch'] = adata.obs['patch'].astype('category')  # Convert to categorical
+elif overlap > 0:
+    patch_cols = adata.obs.columns[adata.obs.columns.str.contains("window")]
+    for col in patch_cols:
+        adata.obs[col] = adata.obs[col].astype(bool)  # Convert to boolean
+
 print('Writing adata with sliding window assignment...')
-adata.write_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/Neutro_Epi_extImm_pooled_A_EM_N_combined_adatas_w_patches.h5ad')
+adata.write_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{celltype_key}_combined_adatas_w_patches_{p_size}_{overlap}.h5ad')
 
 # Plot spatial scatter with patches
-print('Plotting spatial scatter with patches...')
-sq.pl.spatial_scatter(adata, color="pt_id", library_id="spatial", shape=None)
-plt.legend().remove()
-plt.savefig(os.path.join(args.output_dir_plots,'spatial_scatter_patches.png'))
-plt.close()
+#print('Plotting spatial scatter with patches...')
+#sq.pl.spatial_scatter(adata, color="pt_id", library_id="spatial", shape=None)
+#plt.legend().remove()
+#plt.savefig(os.path.join(args.output_dir_plots,f'overlap_{overlap}/spatial_scatter_patches.png'))
+#plt.close()
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 3 Create patch adata (patches as observations)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-patches = adata.obs['patch'].unique()
-print(f'Total number of patches: {len(patches)}')
+if overlap == 0:
+    print('No overlap between patches. Patch size:', args.patch_size, 'Overlap:', overlap)
+    patches = adata.obs['patch'].unique()
+    print(f'Total number of patches: {len(patches)}')
 
-# Remove patches with too few cells
-#--------------------------------------------------------------------------------
-patches_to_keep = []
-for patch in patches:
-    adata_patch = adata[adata.obs['patch']==patch]
-    number_of_cells = adata_patch.n_obs
-    if number_of_cells > 20:
-        patches_to_keep.append(patch)
-print(f'Number of patches after filtering for min number of cells (>20): {len(patches_to_keep)}')
+    # Remove patches with too few cells
+    #--------------------------------------------------------------------------------
+    patches_to_keep = []
+    for patch in patches:
+        adata_patch = adata[adata.obs['patch']==patch]
+        number_of_cells = adata_patch.n_obs
+        if number_of_cells > 20:
+            patches_to_keep.append(patch)
+            adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'{patch}.h5ad'))
+    print(f'Number of patches after filtering for min number of cells (>20): {len(patches_to_keep)}')
 
-# Mean gene expression as features
-#--------------------------------------------------------------------------------
-print('---------------------- Creating adata with mean gene expression per patch... ----------------------------')
-X_patch_list = []
-obs_patch_list = []
+    # Mean gene expression as features
+    #--------------------------------------------------------------------------------
+    print('---------------------- Creating adata with mean gene expression per patch... ----------------------------')
+    X_patch_list = []
+    obs_patch_list = []
 
-for patch in patches_to_keep:
-    index = (adata.obs['patch']==patch).to_numpy()   # Find cells belonging to the same patch
-    X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0))        # For each patch get mean expression of all genes across all cells in the patch
-    obs_patch_list.append(adata.obs[index].iloc[0])         # For each patch get obs info from the first cell in the patch
+    for patch in patches_to_keep:
+        index = (adata.obs['patch']==patch).to_numpy()   # Find cells belonging to the same patch
+        X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0))        # For each patch get mean expression of all genes across all cells in the patch
+        obs_patch_list.append(adata.obs[index].iloc[0])         # For each patch get obs info from the first cell in the patch
 
-X_patch = np.vstack(X_patch_list)
-adata_patches_gex = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=adata.var.copy())
-adata_patches_gex.obs["patch"] = adata_patches_gex.obs["patch"].astype("category")
+    X_patch = np.vstack(X_patch_list)
+    adata_patches_gex = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=adata.var.copy())
+    adata_patches_gex.obs["patch"] = adata_patches_gex.obs["patch"].astype("category")
 
-# Normalize and log-transform
-print('Normalizing and log-transforming...')
-adata_patches_gex.layers['raw_counts'] = adata_patches_gex.X.copy()
-sc.pp.normalize_total(adata_patches_gex, target_sum=1e4)
-sc.pp.log1p(adata_patches_gex)
 
-# Dimension reduction
-print('Dimension reduction...')
-sc.pp.pca(adata_patches_gex)
-sc.pp.neighbors(adata_patches_gex, n_neighbors=16)
-sc.tl.umap(adata_patches_gex)
-sc.pl.umap(adata_patches_gex, color='pt_id', show=False, size=5)
-plt.legend().remove()
-plt.savefig(os.path.join(args.output_dir_plots,'umap_patches_gex.png'), dpi=300, bbox_inches='tight')
-plt.close()
+    # Cell type fractions as features
+    #--------------------------------------------------------------------------------
+    print('---------------------- Creating adata with cell type fractions per patch... ----------------------------')
+    X_patch_list = []
+    obs_patch_list = []
 
-# Cell type fractions as features
-#--------------------------------------------------------------------------------
-print('---------------------- Creating adata with cell type fractions per patch... ----------------------------')
-X_patch_list = []
-obs_patch_list = []
+    for patch in patches_to_keep:
+        index = (adata.obs['patch']==patch).to_numpy()   # Find cells belonging to the same patch
+        ct_counts = adata.obs[index][celltype_key].value_counts(normalize=True)  # For each patch get cell type fractions
+        ct_fractions = ct_counts.reindex(adata.obs[celltype_key].cat.categories, fill_value=0).values  # Ensure all cell types are represented in the same order
+        X_patch_list.append(ct_fractions)
+        obs_patch_list.append(adata.obs[index].iloc[0])         # For each patch get obs info from the first cell in the patch
 
-for patch in patches_to_keep:
-    index = (adata.obs['patch']==patch).to_numpy()   # Find cells belonging to the same patch
-    ct_counts = adata.obs[index]['Neutro_Epi_extImm_pooled_A_EM_N'].value_counts(normalize=True)  # For each patch get cell type fractions
-    ct_fractions = ct_counts.reindex(adata.obs['Neutro_Epi_extImm_pooled_A_EM_N'].cat.categories, fill_value=0).values  # Ensure all cell types are represented in the same order
-    X_patch_list.append(ct_fractions)
-    obs_patch_list.append(adata.obs[index].iloc[0])         # For each patch get obs info from the first cell in the patch
+    X_patch = np.vstack(X_patch_list)
+    adata_patches_ct = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=pd.DataFrame(index=adata.obs[celltype_key].cat.categories))
+    adata_patches_ct.obs["patch"] = adata_patches_ct.obs["patch"].astype("category")
+    print(adata_patches_ct)
 
-X_patch = np.vstack(X_patch_list)
-adata_patches_ct = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=pd.DataFrame(index=adata.obs['Neutro_Epi_extImm_pooled_A_EM_N'].cat.categories))
-adata_patches_ct.obs["patch"] = adata_patches_ct.obs["patch"].astype("category")
-print(adata_patches_ct)
+elif overlap > 0:
+    print('Patches are overlapping. Patch size:', args.patch_size, 'Overlap:', overlap)
+    patches = adata.obs.columns[adata.obs.columns.str.contains("patch")]
+    print(f'Total number of patches: {len(patches)}')
+    
+    # Remove patches with too few cells
+    #--------------------------------------------------------------------------------
+    patches_to_keep = []
+    for patch in patches:
+        adata_patch = adata[adata.obs[patch]==True].copy()
+        number_of_cells = adata_patch.n_obs
+        if number_of_cells > 20:
+            patches_to_keep.append(patch)
+            adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'{patch}.h5ad'))
+    print(f'Number of patches after filtering for min number of cells (>20): {len(patches_to_keep)}')
 
-# Normalize and log-transform
-print('Normalizing and log-transforming...')
-adata_patches_ct.layers['raw_counts'] = adata_patches_ct.X.copy()
-sc.pp.normalize_total(adata_patches_ct, target_sum=1e4)
-sc.pp.log1p(adata_patches_ct)
+    # Mean gene expression as features
+    #--------------------------------------------------------------------------------
+    print('---------------------- Creating adata with mean gene expression per patch... ----------------------------')
+    X_patch_list = []
+    obs_patch_list = []
 
-# Dimension reduction
-print('Dimension reduction...')
-sc.pp.pca(adata_patches_ct)
-sc.pp.neighbors(adata_patches_ct, n_neighbors=16)
-sc.tl.umap(adata_patches_ct)
-sc.pl.umap(adata_patches_ct, color='pt_id', show=False, size=5)
-plt.legend().remove()
-plt.savefig(os.path.join(args.output_dir_plots,'umap_patches_ctFraction.png'), dpi=300, bbox_inches='tight')
-plt.close()
+    for patch in patches_to_keep:
+        index = adata.obs[patch].values   # Find cells belonging to the same patch
+        X_patch_list.append(adata.layers['raw_counts'][index].mean(axis=0))        # For each patch get mean expression of all genes across all cells in the patch
+        obs_patch_list.append(adata.obs[index].iloc[0].assign(patch=patch))         # For each patch get obs info from the first cell in the patch
 
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# 4 Save adata of each patch
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-for patch in patches_to_keep:
-    # Gene expression adata
-    adata_patch = adata[adata.obs['patch']==patch]
-    adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'adata_{patch}.h5ad'))
+    X_patch = np.vstack(X_patch_list)
+    adata_patches_gex = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=adata.var.copy())
+    adata_patches_gex.obs["patch"] = adata_patches_gex.obs["patch"].astype("category")
+    adata_patches_gex.obs.drop(columns=patch_cols, inplace=True)
+    print(adata_patches_gex)
+
+    # Cell type fractions as features
+    #--------------------------------------------------------------------------------
+    print('---------------------- Creating adata with cell type fractions per patch... ----------------------------')
+    X_patch_list = []
+    obs_patch_list = []
+
+    for patch in patches_to_keep:
+        index = adata.obs[patch].values   # Find cells belonging to the same patch
+        ct_counts = adata.obs[index][celltype_key].value_counts(normalize=True)  # For each patch get cell type fractions
+        ct_fractions = ct_counts.reindex(adata.obs[celltype_key].cat.categories, fill_value=0).values  # Ensure all cell types are represented in the same order
+        X_patch_list.append(ct_fractions)
+        obs_patch_list.append(adata.obs[index].iloc[0].assign(patch=patch))         # For each patch get obs info from the first cell in the patch
+
+    X_patch = np.vstack(X_patch_list)
+    adata_patches_ct = sc.AnnData(X=X_patch,obs=pd.DataFrame(obs_patch_list).reset_index(drop=True), var=pd.DataFrame(index=adata.obs[celltype_key].cat.categories))
+    adata_patches_ct.obs["patch"] = adata_patches_ct.obs["patch"].astype("category")
+    adata_patches_ct.obs.drop(columns=patch_cols, inplace=True)
+    print(adata_patches_ct)
+
+
+for adata, suffix in [(adata_patches_gex, 'gex'), (adata_patches_ct, 'ctFraction')]:
+    # Normalize and log-transform
+    print('Normalizing and log-transforming...')
+    adata.layers['raw_counts'] = adata.X.copy()
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+
+    # Dimension reduction
+    print('Dimension reduction...')
+    sc.pp.pca(adata)
+    sc.pp.neighbors(adata, n_neighbors=16)
+    sc.tl.umap(adata)
+    sc.pl.umap(adata, color='pt_id', show=False, size=5)
+    plt.legend().remove()
+    plt.savefig(os.path.join(args.output_dir_plots,f'umap_patches_{suffix}.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
 
 print('Done.')
 

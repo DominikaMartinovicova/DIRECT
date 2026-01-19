@@ -25,7 +25,8 @@ adata_path = data_dir + f"combined/{phenotyping_level}_combined_adatas.h5ad"
 #sample_dict = get_sample_dict(adata)
 output_dir_results = f'results/analysis/{phenotyping_level}/'
 output_dir_plots = f'plots/analysis/{phenotyping_level}/'
-
+patch_size = 2000  # in microns
+overlap = 50       # in microns
 # Specify target rules
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
@@ -39,11 +40,11 @@ checkpoint patching:
     input:
         adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad"
     output:
-        patches_adata_dir = directory(data_dir + f'patches_per_sample/{phenotyping_level}/')
+        patches_adata_dir = directory(data_dir + f'adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/')
     params:
-        patch_size = 5000,  # in microns
-        overlap = 50,       # in microns
-        plots_dir = output_dir_plots + 'spatial/patching/'
+        patch_size = patch_size,
+        overlap = overlap,
+        plots_dir = output_dir_plots + f'spatial/patching/{patch_size}um_{overlap}um/'
     #conda:
     #    "xenium_py310"
     shell:
@@ -61,7 +62,7 @@ checkpoint patching:
 #-------------------------------------------------------------------------------------------------------------------
 rule spatial_analysis_per_patch:
     input:
-        adata_patch_subset = data_dir + f'patches_per_sample/{phenotyping_level}/adata_{{patch}}.h5ad'
+        adata_patch_subset = data_dir + f'adata_per_patch/{phenotyping_level}/adata_{{patch}}.h5ad'
     output:
         centrality_scores = output_dir_results + 'spatial/{patch}/centrality_scores.csv',
         nhood_enrichment = output_dir_results + "spatial/{patch}/neighbors_enrichment.pkl",
