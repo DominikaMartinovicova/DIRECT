@@ -116,11 +116,14 @@ if overlap == 0:
     for patch in patches:
         adata_patch = adata[adata.obs['patch']==patch]
         number_of_cells = adata_patch.n_obs
-        if number_of_cells > 20:
+        if number_of_cells > 20 and adata_patch.obs[celltype_key].nunique() > 1:
             patches_to_keep.append(patch)
             adata_patch.obs.drop(columns=patch_cols, inplace=True)
             adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'{patch}.h5ad'))
-    print(f'Number of patches after filtering for min number of cells (>20): {len(patches_to_keep)}')
+        else:
+            with open(os.path.join(args.output_dir_patches,"skipped_patches.txt"), "a") as f:
+                f.write(f"Skipped {patch}: num cells={number_of_cells}, num cell types={adata_patch.obs[celltype_key].nunique()}\n")
+    print(f'Number of patches after filtering for min number of cells (>20) and min number of cell types (>1): {len(patches_to_keep)}')
 
     # Mean gene expression as features
     #--------------------------------------------------------------------------------
@@ -167,11 +170,14 @@ elif overlap > 0:
     for patch in patches:
         adata_patch = adata[adata.obs[patch]==True].copy()
         number_of_cells = adata_patch.n_obs
-        if number_of_cells > 20:
+        if number_of_cells > 20 and adata_patch.obs[celltype_key].nunique() > 1:
             patches_to_keep.append(patch)
             adata_patch.obs.drop(columns=patch_cols, inplace=True)
             adata_patch.write_h5ad(os.path.join(args.output_dir_patches,f'{patch}.h5ad'))
-    print(f'Number of patches after filtering for min number of cells (>20): {len(patches_to_keep)}')
+        else:
+            with open(os.path.join(args.output_dir_patches,"skipped_patches.txt"), "a") as f:
+                f.write(f"Skipped {patch}: num cells={number_of_cells}, num cell types={adata_patch.obs[celltype_key].nunique()}\n")
+    print(f'Number of patches after filtering for min number of cells (>20) and min number of cell types (>1): {len(patches_to_keep)}')
 
     # Mean gene expression as features
     #--------------------------------------------------------------------------------

@@ -40,6 +40,7 @@ import pandas as pd
 import os
 import pickle
 import argparse
+import sys
 
 # Parse arguments from commandline
 #--------------------------------------------------------------------------------
@@ -72,6 +73,7 @@ celltype_key = args.celltype_key
 all_celltype_list = pd.read_csv(args.celltype_list, header=None)[0].tolist()
 output_dir_results=args.output_dir_results
 output_dir_plots=args.output_dir_plots
+patch = os.path.basename(args.input).replace('.h5ad','')
 os.makedirs(output_dir_results, exist_ok=True)
 os.makedirs(output_dir_plots, exist_ok=True)
 
@@ -93,6 +95,11 @@ def reindex_vector(vec, present, all_types):
 # Read adata
 print('Reading data...')
 adata = sc.read_h5ad(args.input)
+
+if adata.obs[celltype_key].nunique() < 2:
+    print(f'Less than 2 cell types present in {patch}, skipping spatial analysis.')
+    sys.exit(0)
+
 present_celltypes = list(adata.obs[celltype_key].cat.categories)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

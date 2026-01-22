@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=Xenium_spatial_analysis
 #SBATCH --partition=defq                 # adjust for your cluster 
-#SBATCH --cpus-per-task=20              # total CPU cores
-#SBATCH --mem=40G  
+#SBATCH --cpus-per-task=40              # total CPU cores
+#SBATCH --mem=100G  
 #SBATCH --time=72:00:00
 #SBATCH --output=/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/logs/analysis/%x_%j.out
 #SBATCH --error=/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/logs/analysis/%x_%j.err
@@ -15,5 +15,8 @@ source /home/P083831/miniconda3/etc/profile.d/conda.sh
 # activate your env 
 conda activate /appdata/users/P083831/conda_envs/xenium_py310
 
+# Go to project root
+cd /net/beegfs/groups/tgac/dmartinovicova_new/DIRECT
+
 # Run (CPU)
-srun python /net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/scripts/analysis_and_plotting/spatial_analysis.py
+snakemake -s Snakefile_analysis -c 40 --rerun-incomplete

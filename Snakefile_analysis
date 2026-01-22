@@ -13,19 +13,17 @@ def spatial_targets(wildcards):
                   patch=get_patches(wildcards), patch_size=patch_size, overlap=overlap)
 
 def combine_inputs(wildcards):
+    files = []
     patches = get_patches(wildcards)
-    centrality_scores = expand(output_dir_results + 'spatial/per_patch/{patch_size}um_{overlap}um/{patch}/centrality_scores.csv',
+    files += expand(output_dir_results + 'spatial/per_patch/{patch_size}um_{overlap}um/{patch}/centrality_scores.csv',
                               patch=patches, patch_size=patch_size, overlap=overlap)
-    nhood_enrichment = expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/neighbors_enrichment.pkl",
+    files += expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/neighbors_enrichment.pkl",
                               patch=patches, patch_size=patch_size, overlap=overlap)
-    interaction_matrix = expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/interaction_matrix.pkl",
+    files += expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/interaction_matrix.pkl",
                                patch=patches, patch_size=patch_size, overlap=overlap)
-    co_occurrence = expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/co_occurrence_probabilities.pkl",
+    files += expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/co_occurrence_probabilities.pkl",
                           patch=patches, patch_size=patch_size, overlap=overlap)
-    return {'centrality_scores': centrality_scores,
-            'nhood_enrichment': nhood_enrichment,
-            'interaction_matrix': interaction_matrix,
-            'co_occurrence': co_occurrence}
+    return files
 
 #+++++++++++++++++++++++++++++++++++++++ 0 PREPARE WILDCARDS AND TARGET ++++++++++++++++++++++++++++++++++++++++++++
 # Prepare wildcards and variables
@@ -40,7 +38,7 @@ adata_path = data_dir + f"combined/{phenotyping_level}_combined_adatas.h5ad"
 #sample_dict = get_sample_dict(adata)
 output_dir_results = f'results/analysis/{phenotyping_level}/'
 output_dir_plots = f'plots/analysis/{phenotyping_level}/'
-patch_size = 5000  # in microns
+patch_size = 200  # in microns
 overlap = 50       # in microns
 # Specify target rules
 #-------------------------------------------------------------------------------------------------------------------
@@ -113,10 +111,10 @@ rule combine_spatial_analysis_results:
         combined_interaction_matrix = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_interaction_matrix.pkl",
         combined_co_occurrence = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_cooccurrence_probabilities.pkl"
     params:
-        adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad",
-        in_dir = output_dir_results + 'spatial/',
-        out_dir_results = output_dir_results + 'spatial/combined/{patch_size}um_{overlap}um/',
-        out_dir_plots = output_dir_plots + 'spatial/combined/{patch_size}um_{overlap}um/'
+        adata_path = data_dir + f"/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/adata_patches_gex.h5ad",
+        in_dir = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/',
+        out_dir_results = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/',
+        out_dir_plots = output_dir_plots + f'spatial/combined/{patch_size}um_{overlap}um/'
     #conda:
     #    "xenium_py310"
     shell:

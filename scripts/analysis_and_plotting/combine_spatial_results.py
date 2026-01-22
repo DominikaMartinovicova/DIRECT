@@ -68,6 +68,7 @@ os.makedirs(output_dir_plots, exist_ok=True)
 # Create a dataframe with sample information
 #--------------------------------------------------------------------------------
 adata = sc.read_h5ad(args.adata)
+print(adata)
 patch_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme",'patch']].drop_duplicates().set_index('patch')
 print(patch_info)
 patches_list = patch_info.index.str.replace('patch_','').tolist()  #list of patches to combine
@@ -152,10 +153,11 @@ with open(os.path.join(output_dir_results, 'combined_centrality_scores.pkl'), 'w
 #--------------------------------------------------------------------------------
 print('Combining neighborhood enrichments...')
 combined_nhood_enrichment = {}
+
 for patch in nhood_results.keys():
     combined_nhood_enrichment[patch] = nhood_results[patch]
-    combined_nhood_enrichment[patch]['sample_type'] = patch_info.loc[patch, 'sample_type']
-    combined_nhood_enrichment[patch]['MPR'] = patch_info.loc[patch, 'MPR']
+    combined_nhood_enrichment[patch]['sample_type'] = patch_info.loc['patch_'+patch, 'sample_type']
+    combined_nhood_enrichment[patch]['MPR'] = patch_info.loc['patch_'+patch, 'MPR']
 #print(combined_nhood_enrichment)
 with open(os.path.join(output_dir_results, 'combined_neighbors_enrichment.pkl'), 'wb') as f:
     pickle.dump(combined_nhood_enrichment, f)
@@ -166,8 +168,8 @@ print('Combining interaction matrices...')
 combined_interaction_matrices = {}
 for patch in interaction_results.keys():
     combined_interaction_matrices[patch] = {'matrix': interaction_results[patch],
-                                             'sample_type': patch_info.loc[patch, 'sample_type'],
-                                             'MPR': patch_info.loc[patch, 'MPR']}
+                                             'sample_type': patch_info.loc['patch_'+patch, 'sample_type'],
+                                             'MPR': patch_info.loc['patch_'+patch, 'MPR']}
 #print(combined_interaction_matrices)
 with open(os.path.join(output_dir_results, 'combined_interaction_matrix.pkl'), 'wb') as f:
     pickle.dump(combined_interaction_matrices, f)
@@ -178,8 +180,8 @@ print('Combining co-occurrence probabilities...')
 combined_cooccurrence_probs={}
 for patch in cooccurrence_results.keys():
     combined_cooccurrence_probs[patch] = cooccurrence_results[patch]
-    combined_cooccurrence_probs[patch]['sample_type'] = patch_info.loc[patch, 'sample_type']
-    combined_cooccurrence_probs[patch]['MPR'] = patch_info.loc[patch, 'MPR']
+    combined_cooccurrence_probs[patch]['sample_type'] = patch_info.loc['patch_'+patch, 'sample_type']
+    combined_cooccurrence_probs[patch]['MPR'] = patch_info.loc['patch_'+patch, 'MPR']
 #print(combined_cooccurrence_probs)
 with open(os.path.join(output_dir_results, 'combined_cooccurrence_probabilities.pkl'), 'wb') as f:
     pickle.dump(combined_cooccurrence_probs, f)
