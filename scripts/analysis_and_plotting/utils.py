@@ -23,8 +23,10 @@ import pandas as pd
 def preprocess_adata(adata_path, exclude_v17=True,phenotyping_level=None):
     print('Reading adata...')
     adata = sc.read_h5ad(adata_path)
+    ex_v17 = 'w_v1.7'
     if exclude_v17 == True:
         print('Excluding v1.7 samples...')
+        ex_v17 = 'wo_v1.7'
         adata = adata[adata.obs['treatment_scheme'] != 'v1.7', :].copy()
     
     # Add MPR column
@@ -32,16 +34,22 @@ def preprocess_adata(adata_path, exclude_v17=True,phenotyping_level=None):
     reg = pd.to_numeric(adata.obs['regression'], errors="coerce")
     adata.obs['MPR'] = np.where(reg < 90.0,"<90",">=90")
     print(adata)
-    adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad")
+    #adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad")
 
-    # Savecell type list
+    # Add treatment column
+    print('Adding treatment column...')
+    adata.obs['treatment'] = np.where(adata.obs['treatment_scheme'] == 'v1.7',"aggressive","milder")
+    print(adata)
+    adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad")
+
+    # Save cell type list
     print('Saving cell type list...')
     celltype_list = sorted(adata.obs[phenotyping_level].unique().tolist())
-    pd.Series(celltype_list).to_csv(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_celltype_list.txt", index=False, header=False)
+    pd.Series(celltype_list).to_csv(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_celltype_list_{ex_v17}.txt", index=False, header=False)
     print(celltype_list)
     print('Preprocessing done.')
     samples_list = adata.obs['sample'].unique().tolist()
-    return samples_list, adata
+    return samples_list, adata, ex_v17
 
 # Save per-sample adatas
 #-------------------------------------------------------------------------------

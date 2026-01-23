@@ -498,23 +498,35 @@ def celltype_fraction_shifts_box(df, output_dir, output_dir_results, exclude_v17
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Create fractions dataframe
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Remove cells coming from samples treated with treatment_scheme=v1.7
+if exclude_v17 == True:
+    print('Removing samples with treatment_scheme=v1.7...')
+    adata = adata[adata.obs['treatment_scheme'] != 'v1.7', :]
+    output_dir = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{celltype_key}/celltype_fraction_wo_v1.7/'
+    output_dir_results = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis/{celltype_key}/celltype_fraction_wo_v1.7/'
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir_results, exist_ok=True)
+    print(f'Number of cells after removing v1.7 treatment scheme samples: {adata.shape[0]}')
+
 # Calculate fractions per T_number
 fractions_df = pd.DataFrame(dtype=object)
 for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
-    print(f'Processing {i}. T_number: {element}')
+    #print(f'Processing {i}. T_number: {element}')
     adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
     total_cells_temp = adata_temp.shape[0] # Total number of cells for this T_number
     temp_fractions = adata_temp.obs[celltype_key].value_counts()/total_cells_temp # Calculate fractions
     fractions_df = pd.concat([fractions_df, temp_fractions.rename(element)], axis=1) # Save fractions to df
 
     # Add metadata to the fractions_df
-    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme', 'MPR'] #'structure',
+    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme'] #'structure',
     for meta in meta_list: 
         fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
 
 # Adjust dataframe for plotting
 fractions_df = fractions_df.T.fillna(0) # Transpose for easier plotting and fill NaNs with 0
 fractions_df.columns = [f'{col} fraction' if col not in meta_list else col for col in fractions_df.columns] # Add suffix to fraction columns
+fractions_df['MPR'] = np.where(fractions_df['regression']>=90, '>=90', '<90') # Create MPR column
+fractions_df['treatment'] = np.where(fractions_df['treatment_scheme'] == 'v1.7', 'aggressive', 'milder') # Create treatment column
 print(fractions_df.head())
 
 # Keep only patients with matched biopsy and resection samples

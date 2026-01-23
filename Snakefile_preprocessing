@@ -171,27 +171,3 @@ rule cell_fraction_analysis:
 
 
 
-# 2.2 Analyze spatial proximity of cell types
-rule spatial_analysis:
-    input:
-        combined_adatas = data_dir + "combined/{phenotyping_level}_combined_adatas.h5ad"
-    output:
-        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
-    #conda:
-    #    "envs=""
-    params:
-        out_plot_dir = 'plots/analysis/spatial/{phenotyping_level}/',
-        phen_level = "{phenotyping_level}"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/spatial_analysis.py \
-	    -i {input.combined_adatas} \
-        --phen_level {params.phen_level} \
-        -o {output.checked_adatas} \
-        --output_plot {params.out_plot_dir}
-        """
-
-
-# 2.3 Analyze ... 
-
-
