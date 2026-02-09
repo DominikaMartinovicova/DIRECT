@@ -20,7 +20,7 @@ import pandas as pd
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Remove v1.7 samples and add MPR column
 #-------------------------------------------------------------------------------
-def preprocess_adata(adata_path, exclude_v17=True,phenotyping_level=None):
+def preprocess_adata(adata_path, exclude_v17, phenotyping_level=None):
     print('Reading adata...')
     adata = sc.read_h5ad(adata_path)
     ex_v17 = 'w_v1.7'

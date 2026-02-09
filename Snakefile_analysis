@@ -41,11 +41,14 @@ output_dir_results = f'results/analysis/{phenotyping_level}/'
 output_dir_plots = f'plots/analysis/{phenotyping_level}/'
 patch_size = 200  # in microns
 overlap = 50       # in microns
+print('Exclude v1.7 samples:', exclude_v17)
+
+
 # Specify target rules
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl'
+        analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
 
 
 
@@ -61,13 +64,14 @@ rule cell_fraction_analysis:
         out_plot_dir = f'plots/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}/',
         out_results = f'results/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}/',
         phen_level = phenotyping_level,
-        exclude_v17 = exclude_v17
+        exclude_flag = "--exclude_v17" if exclude_v17 else ""
+
     shell:
         """
         python3 scripts/analysis_and_plotting/cell_fraction_analysis.py \
 	    -i {input.combined_adatas} \
         --phen_level {params.phen_level} \
-        --exclude_v17 {params.exclude_v17} \
+        {params.exclude_flag} \
         -o {output.analyzed_adatas} \
         --output_results {params.out_results} \
         --output_dir_plots {params.out_plot_dir}

@@ -57,9 +57,8 @@ def parse_args():
     parser.add_argument('--phen_level', help='key for cell type annotation in adata.obs',
                         dest='phen_level',
                         type=str)
-    parser.add_argument('--exclude_v17', help='whether to exclude v17 samples',
-                        dest='exclude_v17',
-                        type=bool)
+    parser.add_argument('--exclude_v17', action='store_true',
+                        help='Exclude v1.7 samples')
     parser.add_argument('-o', '--output_results', help='path to output dir with patches per sample',
                         dest='output_dir_results',
                         type=str)
@@ -73,6 +72,7 @@ args = parse_args()
 
 celltype_key = args.phen_level
 exclude_v17 = args.exclude_v17
+print(f'Excluding v1.7 samples: {exclude_v17}')
 output_dir_results = args.output_dir_results
 output_dir = args.output_dir_plots
 
@@ -85,13 +85,14 @@ os.makedirs(output_dir_results, exist_ok=True)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Read adata
 print('Reading data...')
-adata = sc.read_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{celltype_key}_combined_adatas.h5ad')
-
+adata = sc.read_h5ad(args.input)
+print(adata)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Define functions for analyses
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Analyse shifts in cell fractions before and after treatment
 def celltype_fraction_shifts_lineplot(df, output_dir, output_dir_results, category, exclude_v17, stat_test, perform_stat_test = False, immune = False):
+    print(exclude_v17)
     # Split data into pre- and post-treatment
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
 
@@ -223,7 +224,7 @@ def celltype_fraction_shifts_lineplot(df, output_dir, output_dir_results, catego
         g.legend.set_title('Sample Type')
         g.legend.set_loc('upper right')
         plt.tight_layout()
-        plt.savefig(f'{output_dir}{category}_celltype_fraction_shifts_lineplot.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shifts_lineplot.svg', format='svg')
+        plt.savefig(f'{output_dir}{category}_celltype_fraction_shifts_lineplot_{stat_test.__name__}.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shifts_lineplot_{stat_test.__name__}.svg', format='svg')
         plt.close()
 
 # Perform statistical testing
@@ -494,6 +495,9 @@ def celltype_fraction_shifts_box(df, output_dir, output_dir_results, exclude_v17
         plt.savefig(f'{output_dir}{category}_celltype_fraction_shift_box_{stat_test.__name__}.svg', format='svg') if immune==False else plt.savefig(f'{output_dir}{category}_immune_celltype_fraction_shift_box_{stat_test.__name__}.svg', format='svg')
         plt.close()
 
+def composition_within_sampletype_box(df, output_dir, output_dir_results, sample_type, exclude_v17, stat_test=mannwhitneyu, perform_stat_test=False, immune=False):
+    
+
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Create fractions dataframe
@@ -501,21 +505,21 @@ def celltype_fraction_shifts_box(df, output_dir, output_dir_results, exclude_v17
 # Calculate fractions per T_number
 fractions_df = pd.DataFrame(dtype=object)
 for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
-    print(f'Processing {i}. T_number: {element}')
+    #print(f'Processing {i}. T_number: {element}')
     adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
     total_cells_temp = adata_temp.shape[0] # Total number of cells for this T_number
     temp_fractions = adata_temp.obs[celltype_key].value_counts()/total_cells_temp # Calculate fractions
     fractions_df = pd.concat([fractions_df, temp_fractions.rename(element)], axis=1) # Save fractions to df
 
     # Add metadata to the fractions_df
-    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme', 'MPR'] #'structure',
+    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme', 'MPR', 'treatment'] #'structure',
     for meta in meta_list: 
         fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
 
 # Adjust dataframe for plotting
 fractions_df = fractions_df.T.fillna(0) # Transpose for easier plotting and fill NaNs with 0
 fractions_df.columns = [f'{col} fraction' if col not in meta_list else col for col in fractions_df.columns] # Add suffix to fraction columns
-print(fractions_df.head())
+#print(fractions_df.head())
 
 # Keep only patients with matched biopsy and resection samples
 resection_pts = fractions_df[fractions_df['sample_type']=='Resection']['pt_id'].tolist()
@@ -523,17 +527,21 @@ biopsy_pts = fractions_df[fractions_df['sample_type']=='Biopsy']['pt_id'].tolist
 paired_pts = list(set(resection_pts) & set(biopsy_pts))
 paired_fractions_df = fractions_df[fractions_df['pt_id'].isin(paired_pts)]
 print(f'Number of paired patients: {len(paired_fractions_df["pt_id"].unique())}')
-print(paired_fractions_df.head())
+#print(paired_fractions_df.head())
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-categories = [None, 'MPR'] #, 'treatment']
+categories = [None, 'MPR', 'treatment']
 for category in categories:
     print(f'Analyzing category: {category}')
     celltype_fraction_shifts_lineplot(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
     celltype_fraction_composition_box(fractions_df, output_dir, output_dir_results, category = category, exclude_v17=exclude_v17, immune=False, stat_test = mannwhitneyu, perform_stat_test=True)
-    celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    # celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+
+sample_types = ['Biopsy', 'Resection']
+for sample_type in sample_types:
+    celltype_fraction_within_same_sampletype_box(fractions_df, output_dir, output_dir_results, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
 
 
 # Focus on immune cell types only
@@ -550,4 +558,4 @@ print(df_immune.head())
 for category in categories:    
     celltype_fraction_shifts_lineplot(df_immune, output_dir,output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=True,exclude_v17=exclude_v17)
     celltype_fraction_composition_box(df_immune, output_dir, output_dir_results, category = category, immune=True, exclude_v17=exclude_v17, stat_test = mannwhitneyu, perform_stat_test=True)
-    celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+#     celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
