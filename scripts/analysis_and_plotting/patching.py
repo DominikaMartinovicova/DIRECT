@@ -95,11 +95,21 @@ print('Writing adata with sliding window assignment...')
 adata.write_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{celltype_key}_combined_adatas_w_patches_{p_size}_{overlap}.h5ad')
 
 # Plot spatial scatter with patches
-#print('Plotting spatial scatter with patches...')
-#sq.pl.spatial_scatter(adata, color="pt_id", library_id="spatial", shape=None)
-#plt.legend().remove()
-#plt.savefig(os.path.join(args.output_dir_plots,f'overlap_{overlap}/spatial_scatter_patches.png'))
-#plt.close()
+if overlap == 0:
+    patient = 'T23004535_110005'
+    adata_pt = adata[adata.obs['pt_id']==patient].copy()
+    print('Plotting spatial scatter with patches (no overlap)...')
+    sq.pl.spatial_scatter(adata_pt, color="patch", library_id="spatial", shape=None)
+    plt.legend().remove()
+    plt.title(f"Sliding windows (patches) — {patient}")
+    plt.savefig(os.path.join(args.output_dir_plots,f'overlap_{overlap}/spatial_scatter_patches_{patient}.png'))
+    plt.close()
+else:
+    print('Plotting spatial scatter with patches (with overlap)...')
+    sq.pl.spatial_scatter(adata, color=patch_cols, library_id="spatial", shape=None)
+    plt.legend().remove()
+    plt.savefig(os.path.join(args.output_dir_plots,f'overlap_{overlap}/spatial_scatter_patches.png'))
+    plt.close()
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

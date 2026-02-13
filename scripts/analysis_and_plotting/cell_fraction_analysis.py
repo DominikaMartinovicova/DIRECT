@@ -439,19 +439,19 @@ def celltype_fraction_shifts_box(df, output_dir, output_dir_results, exclude_v17
             stat_df, stat_df_annot = ind_stat_testing(diff_df, cell_fraction_cols, stat_test, category)
             if immune==False and exclude_v17==False:
                 stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_celltype_fraction_shift_statistical_results_w_v1.7.csv', index=False) 
-                #plt.title(f"Cell Type Fraction Shift in Biopsy vs Resection, ({stat_test.__name__})")
+                plt.title(f"Cell Type Fraction Shift in Biopsy vs Resection, ({stat_test.__name__})")
                 file_name = f'{output_dir}{category}_celltype_fraction_shift_box_{stat_test.__name__}_w_v1.7.svg'
             elif immune==True and exclude_v17==False:
                 stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_immune_celltype_fraction_shift_statistical_results_w_v1.7.csv', index=False)
-                #plt.title(f"Immune Cell Type Fraction Shift in Biopsy vs Resection, ({stat_test.__name__})")
+                plt.title(f"Immune Cell Type Fraction Shift in Biopsy vs Resection, ({stat_test.__name__})")
                 file_name = f'{output_dir}{category}_immune_celltype_fraction_shift_box_{stat_test.__name__}_w_v1.7.svg'
             elif immune==False and exclude_v17==True:
                 stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_celltype_fraction_shift_statistical_results_wo_v1.7.csv', index=False)
-                #plt.title(f"Cell Type Fraction Shift in Biopsy vs Resection (excluding v1.7 treatment scheme), ({stat_test.__name__})")
+                plt.title(f"Cell Type Fraction Shift in Biopsy vs Resection (excluding v1.7 treatment scheme), ({stat_test.__name__})")
                 file_name = f'{output_dir}{category}_celltype_fraction_shift_box_{stat_test.__name__}_wo_v1.7.svg'
             elif immune==True and exclude_v17==True:
                 stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_immune_celltype_fraction_shift_statistical_results_wo_v1.7.csv', index=False) 
-                #plt.title(f"Immune Cell Type Fraction Shift in Biopsy vs Resection (excluding v1.7 treatment scheme), ({stat_test.__name__})") 
+                plt.title(f"Immune Cell Type Fraction Shift in Biopsy vs Resection (excluding v1.7 treatment scheme), ({stat_test.__name__})") 
                 file_name = f'{output_dir}{category}_immune_celltype_fraction_shift_box_{stat_test.__name__}_wo_v1.7.svg'
         
             # Generate pairs for significant comparisons only
@@ -640,6 +640,7 @@ df_only_immune = df_only_immune[df_only_immune.columns[df_only_immune.columns.st
 df_immune = df_only_immune.div(df_only_immune.sum(axis=1), axis=0)  # Re-normalize to sum to 1
 df_immune[['pt_id', 'sample_type', 'MPR', 'treatment']] = paired_fractions_df[['pt_id', 'sample_type', 'MPR', 'treatment']].values # Add metadata back
 print(df_immune.head())
+sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
 
 for category in categories:    
     celltype_fraction_shifts_lineplot(df_immune, output_dir,output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=True,exclude_v17=exclude_v17)
@@ -648,4 +649,4 @@ for category in categories:
     if category != None:
         for sample_type in sample_types:
             sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
-            composition_within_sampletype_box(sample_type_df, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+            composition_within_sampletype_box(sample_type_df_immune, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)

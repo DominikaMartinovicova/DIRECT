@@ -31,9 +31,13 @@ def combine_inputs(wildcards):
 data_dir = 'data/'
 log_dir = 'logs/analysis/'
 exclude_v17 = False
+if exclude_v17:
+    ex_v17 = "wo_v1.7"
+elif not exclude_v17:
+    ex_v17 = "w_v1.7"
 phenotyping_level = 'Neutro_Epi_extImm_pooled_A_EM_N'
 adata_path = data_dir + f"combined/{phenotyping_level}_combined_adatas.h5ad"
-samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
+#samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
 adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad"
 #save_per_sample_adata(adata, output_dir=data_dir + f'per_sample/{phenotyping_level}/')
 #sample_dict = get_sample_dict(adata)
@@ -48,7 +52,7 @@ print('Exclude v1.7 samples:', exclude_v17)
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+        analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
 
 
 
@@ -78,10 +82,34 @@ rule cell_fraction_analysis:
         """
 
 
+#+++++++++++++++++++++++++++++++++++++++ 2 GENE EXPRESSION ANALYSIS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
+rule gene_expression_analysis:
+    input:
+        combined_adatas = adata_processed_path
+    output:
+        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
+    conda:
+        "/appdata/users/P083831/conda_envs/scverse_py311"
+    params:
+        out_plot_dir = f'plots/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
+        out_results = f'results/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
+        phen_level = phenotyping_level,
+        exclude_flag = "--exclude_v17" if exclude_v17 else ""
+
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/gex_analysis.py \
+	    -i {input.combined_adatas} \
+        --phen_level {params.phen_level} \
+        {params.exclude_flag} \
+        -o {output.analyzed_adatas} \
+        --output_results {params.out_results} \
+        --output_dir_plots {params.out_plot_dir}
+        """
 
 
 
-#+++++++++++++++++++++++++++++++++++++++ 2 SPATIALLY ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
+#+++++++++++++++++++++++++++++++++++++++ 3 SPATIALLY ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
 # Divide each piece of tissue into smaller regions (patches) and analyze them separately
 #-------------------------------------------------------------------------------------------------------------------
 checkpoint patching:
