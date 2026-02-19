@@ -97,7 +97,7 @@ print(adata)
 # 2 Define functions for analyses
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 def dge_analysis_BvsR(pdata, celltype_key, exclude_v17, celltype, output_dir):
-    os.makedirs(output_dir + 'BvsR/', exist_ok=True)
+    os.makedirs(output_dir + 'BvsR/overall/', exist_ok=True)
     exv17 = '(excluding v1.7)' if exclude_v17 else ''
     excl_v17 = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
     if celltype == None:
@@ -109,21 +109,21 @@ def dge_analysis_BvsR(pdata, celltype_key, exclude_v17, celltype, output_dir):
         #print(res_df)
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
-        plt.title(f'Volcano plot of DGE between Biopsy and Resection samples {exv17}')
-        plt.savefig(os.path.join(output_dir, f'BvsR/volcano_plot_BvsR_{excl_v17}.png'), bbox_inches='tight')
+        plt.title(f'DGE Biopsy vs. Resection samples {exv17}')
+        plt.savefig(os.path.join(output_dir, f'BvsR/overall/volcano_plot_BvsR_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
         edgr.plot_paired(pdata, results_df=res_df, n_top_vars=5, groupby="sample_type", pairedby="MPR")
-        plt.suptitle(f'Top 5 differentially expressed genes between Biopsy and Resection samples {exv17}')
+        plt.suptitle(f'Top 5 differentially expressed genes in Biopsy vs. Resection {exv17}')
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'BvsR/paired_top5_dge_BvsR_{excl_v17}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'BvsR/overall/paired_top5_dge_BvsR_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
         res_df = edgr.compare_groups(pdata, column="sample_type", baseline="Biopsy", groups_to_compare="Resection")
         edgr.plot_multicomparison_fc(res_df)
-        plt.title(f'Log2FC comparison between Biopsy and Resection samples {exv17}')
+        plt.title(f'Log2FC comparison between Biopsy and Resection {exv17}')
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'BvsR/log2fc_comparison_BvsR_{excl_v17}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'BvsR/overall/log2fc_comparison_BvsR_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
     else:
         print(f'Creating edgeR object and fitting model for cell type: {celltype}...')
@@ -134,14 +134,14 @@ def dge_analysis_BvsR(pdata, celltype_key, exclude_v17, celltype, output_dir):
         #print(res_df)
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
-        plt.title(f'Volcano plot of DGE between Biopsy and Resection samples in {celltype} {exv17}')
-        plt.savefig(os.path.join(output_dir, f'BvsR/volcano_plot_BvsR_{celltype}_{excl_v17}.png'), bbox_inches='tight')
+        plt.title(f'DGE between Biopsy and Resection samples in {celltype} {exv17}')
+        plt.savefig(os.path.join(output_dir, f'BvsR/overall/volcano_plot_BvsR_{celltype}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
         edgr.plot_paired(pdata, results_df=res_df, n_top_vars=5, groupby="sample_type", pairedby="MPR")
-        plt.suptitle(f'Top 5 differentially expressed genes between Biopsy and Resection samples in {celltype} {exv17}')
+        plt.suptitle(f'Top 5 differentially expressed genes between Biopsy and Resection in {celltype} {exv17}')
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'BvsR/paired_top5_dge_BvsR_{celltype}_{excl_v17}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'BvsR/overall/paired_top5_dge_BvsR_{celltype}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()   
 
 
@@ -165,13 +165,13 @@ def dge_analysis_within_sampletype(pdata, celltype_key, sample_type, category, e
         #print(res_df)
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
-        plt.title(f'Volcano plot of DGE in {sample_type} samples {exv17}')
+        plt.title(f'DGE in {sample_type} samples in {group1} vs. {group2} {exv17}')
         plt.savefig(os.path.join(output_dir, f'{sample_type}/{category}/volcano_plot_{category}_{sample_type}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
         res_df = edgr.compare_groups(pdata, column=category, baseline=group1, groups_to_compare=group2)
         edgr.plot_multicomparison_fc(res_df)
-        plt.title(f'Log2FC comparison between {category} groups {exv17}')
+        plt.title(f'Log2FC comparison between {category} groups in {sample_type} {exv17}')
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f'{sample_type}/{category}/log2fc_comparison_{category}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
@@ -185,29 +185,29 @@ def dge_analysis_within_sampletype(pdata, celltype_key, sample_type, category, e
         #print(res_df)
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
-        plt.title(f'Volcano plot of DGE in {sample_type} samples in {celltype} {exv17}')
+        plt.title(f'DGE in {sample_type} samples in {group1} vs. {group2} {celltype} {exv17}')
         plt.savefig(os.path.join(output_dir, f'{sample_type}/{category}/volcano_plot_{category}_{sample_type}_{celltype}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
         res_df = edgr.compare_groups(pdata, column=category, baseline=group1, groups_to_compare=group2)
         edgr.plot_multicomparison_fc(res_df)
-        plt.title(f'Log2FC comparison between {category} groups in {celltype} {exv17}')
+        plt.title(f'Log2FC comparison between {category} groups in {sample_type} in {celltype} {exv17}')
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f'{sample_type}/{category}/log2fc_comparison_{category}_{sample_type}_{celltype}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
 
 
-def dge_analysis_within_category(pdata, celltype_key, category, sample_type, exclude_v17, celltype, output_dir):
+def dge_analysis_within_category(pdata, celltype_key, category, group, sample_type, exclude_v17, celltype, output_dir):
     os.makedirs(output_dir + f'BvsR/{category}/', exist_ok=True)
     exv17 = '(excluding v1.7)' if exclude_v17 else ''
     excl_v17 = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
     
     if pdata.obs[sample_type].nunique() != 2:
-        print(f'Category {category} does not have exactly 2 groups in sample type {sample_type}. Skipping DGE analysis for this category and sample type.')
+        print(f'Category {category} does not have exactly 2 groups in sample type. Skipping DGE analysis for this category and sample type.')
         return
     elif pdata.obs[sample_type].nunique() == 2:
-        group1, group2 = pdata.obs[sample_type].unique()
+        group1, group2 = 'Biopsy', 'Resection' #pdata.obs[sample_type].unique()
     
     if celltype == None:
         print(f'Creating edgeR object and fitting model for category: {category}...')
@@ -218,15 +218,15 @@ def dge_analysis_within_category(pdata, celltype_key, category, sample_type, exc
         #print(res_df)
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
-        plt.title(f'Volcano plot of DGE in {sample_type} groups {exv17}')
-        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{sample_type}_{excl_v17}.png'), bbox_inches='tight')
+        plt.title(f'DGE in {category} {group} in {group1} vs. {group2} {exv17}')
+        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{category}_{group}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
         res_df = edgr.compare_groups(pdata, column=sample_type, baseline=group1, groups_to_compare=group2)
         edgr.plot_multicomparison_fc(res_df)
-        plt.title(f'Log2FC comparison between {sample_type} groups {exv17}')
+        plt.title(f'Log2FC comparison between {group1} and {group2} groups in {category} {group} {exv17}')
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/log2fc_comparison_{category}_{excl_v17}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/log2fc_comparison_{category}_{group}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
     else:
@@ -238,13 +238,9 @@ def dge_analysis_within_category(pdata, celltype_key, category, sample_type, exc
         #print(res_df)
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
-        plt.title(f'Volcano plot of DGE in {sample_type} groups in {celltype} {exv17}')
-        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{sample_type}_{celltype}_{excl_v17}.png'), bbox_inches='tight')
+        plt.title(f'DGE in {category} {group} in {group1} vs. {group2} in  {celltype} {exv17}')
+        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{category}_{group}_{celltype}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
-
-
-
-
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -279,14 +275,12 @@ for sample_t in sample_type:
 
 for category in categories:
     print(f'Performing DGE analysis for category: {category}...')
-    dge_analysis_within_category(pdata = pdata, celltype_key=celltype_key, category=category, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=None)
     group1, group2 = pdata.obs[category].unique()
     for group in [group1, group2]:
         pdata_subset = pdata[pdata.obs[category]==group, :].copy()
-        dge_analysis_within_category(pdata = pdata_subset, celltype_key=celltype_key, category=category, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=None)
+        dge_analysis_within_category(pdata = pdata_subset, celltype_key=celltype_key, category=category, group=group, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=None)
         for celltype in pdata.obs[celltype_key].unique():
             print(f'Performing DGE analysis for category: {category} in cell type: {celltype}...')
             pdata_ct = pdata[pdata.obs[celltype_key] == celltype, :].copy()
-            dge_analysis_within_category(pdata = pdata_ct, celltype_key=celltype_key, category=category, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=celltype)
-
+            dge_analysis_within_category(pdata = pdata_ct, celltype_key=celltype_key, category=category, group=group, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=celltype)
 
