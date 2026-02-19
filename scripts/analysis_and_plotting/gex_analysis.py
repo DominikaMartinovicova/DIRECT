@@ -119,7 +119,7 @@ def dge_analysis_BvsR(pdata, celltype_key, exclude_v17, celltype, output_dir):
         plt.savefig(os.path.join(output_dir, f'BvsR/overall/paired_top5_dge_BvsR_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
-        res_df = edgr.compare_groups(pdata, column="sample_type", baseline="Biopsy", groups_to_compare="Resection")
+        res_df = edgr.compare_groups(pdata, column="sample_type", baseline="Biopsy", groups_to_compare="Resection", paired_by="pt_id")
         edgr.plot_multicomparison_fc(res_df)
         plt.title(f'Log2FC comparison between Biopsy and Resection {exv17}')
         plt.tight_layout()
@@ -208,6 +208,8 @@ def dge_analysis_within_category(pdata, celltype_key, category, group, sample_ty
         return
     elif pdata.obs[sample_type].nunique() == 2:
         group1, group2 = 'Biopsy', 'Resection' #pdata.obs[sample_type].unique()
+
+    group_name = group.replace('<', 'lt_').replace('>=', 'mt_')
     
     if celltype == None:
         print(f'Creating edgeR object and fitting model for category: {category}...')
@@ -219,14 +221,14 @@ def dge_analysis_within_category(pdata, celltype_key, category, group, sample_ty
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
         plt.title(f'DGE in {category} {group} in {group1} vs. {group2} {exv17}')
-        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{category}_{group}_{excl_v17}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{category}_{group_name}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
         res_df = edgr.compare_groups(pdata, column=sample_type, baseline=group1, groups_to_compare=group2)
         edgr.plot_multicomparison_fc(res_df)
         plt.title(f'Log2FC comparison between {group1} and {group2} groups in {category} {group} {exv17}')
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/log2fc_comparison_{category}_{group}_{excl_v17}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/log2fc_comparison_{category}_{group_name}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
     else:
@@ -239,7 +241,7 @@ def dge_analysis_within_category(pdata, celltype_key, category, group, sample_ty
 
         edgr.plot_volcano(res_df, log2fc_thresh=0)
         plt.title(f'DGE in {category} {group} in {group1} vs. {group2} in  {celltype} {exv17}')
-        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{category}_{group}_{celltype}_{excl_v17}.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'BvsR/{category}/volcano_plot_{category}_{group_name}_{celltype}_{excl_v17}.png'), bbox_inches='tight')
         plt.close()
 
 
@@ -257,20 +259,24 @@ dge_analysis_BvsR(pdata = pdata, celltype_key=celltype_key, celltype=None, exclu
 for celltype in pdata.obs[celltype_key].unique():
     print(f'Performing DGE analysis for cell type: {celltype}...')
     pdata_ct = pdata[pdata.obs[celltype_key] == celltype, :].copy()
-    dge_analysis_BvsR(pdata = pdata_ct, celltype_key=celltype_key, celltype=celltype, exclude_v17=exclude_v17, output_dir=output_dir)
+    #dge_analysis_BvsR(pdata = pdata_ct, celltype_key=celltype_key, celltype=celltype, exclude_v17=exclude_v17, output_dir=output_dir)
 
+if exclude_v17:
+    categories = ['MPR']
+    sample_type = ['Biopsy', 'Resection']
+elif not exclude_v17:
+    categories = ['MPR', 'treatment']
+    sample_type = ['Biopsy', 'Resection']
 
-categories = ['MPR', 'treatment']
-sample_type = ['Biopsy', 'Resection']
 for sample_t in sample_type:
     pdata_st = pdata[pdata.obs['sample_type'] == sample_t, :].copy()
     for category in categories:
         print(f'Performing DGE analysis for category: {category}...')
-        dge_analysis_within_sampletype(pdata = pdata_st, celltype_key=celltype_key, sample_type=sample_t, category=category, output_dir=output_dir, exclude_v17=exclude_v17, celltype=None)
+        #dge_analysis_within_sampletype(pdata = pdata_st, celltype_key=celltype_key, sample_type=sample_t, category=category, output_dir=output_dir, exclude_v17=exclude_v17, celltype=None)
         for celltype in pdata.obs[celltype_key].unique():
             print(f'Performing DGE analysis for category: {category} in cell type: {celltype}...')
             pdata_st_ct = pdata_st[pdata_st.obs[celltype_key] == celltype, :].copy()
-            dge_analysis_within_sampletype(pdata = pdata_st_ct, celltype_key=celltype_key, sample_type=sample_t, category=category, output_dir=output_dir, exclude_v17=exclude_v17, celltype=celltype)
+            #dge_analysis_within_sampletype(pdata = pdata_st_ct, celltype_key=celltype_key, sample_type=sample_t, category=category, output_dir=output_dir, exclude_v17=exclude_v17, celltype=celltype)
 
 
 for category in categories:
@@ -278,9 +284,9 @@ for category in categories:
     group1, group2 = pdata.obs[category].unique()
     for group in [group1, group2]:
         pdata_subset = pdata[pdata.obs[category]==group, :].copy()
-        dge_analysis_within_category(pdata = pdata_subset, celltype_key=celltype_key, category=category, group=group, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=None)
+        #dge_analysis_within_category(pdata = pdata_subset, celltype_key=celltype_key, category=category, group=group, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=None)
         for celltype in pdata.obs[celltype_key].unique():
             print(f'Performing DGE analysis for category: {category} in cell type: {celltype}...')
             pdata_ct = pdata[pdata.obs[celltype_key] == celltype, :].copy()
-            dge_analysis_within_category(pdata = pdata_ct, celltype_key=celltype_key, category=category, group=group, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=celltype)
+            #dge_analysis_within_category(pdata = pdata_ct, celltype_key=celltype_key, category=category, group=group, sample_type='sample_type', output_dir=output_dir, exclude_v17=exclude_v17, celltype=celltype)
 
