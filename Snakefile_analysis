@@ -63,7 +63,7 @@ print('Exclude v1.7 samples:', exclude_v17)
 rule all:
     input:
         #analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
-        spatial_targets_core
+        output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl'
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -250,17 +250,17 @@ rule spatial_analysis_per_core:
 #-------------------------------------------------------------------------------------------------------------------
 rule combine_core_spatial_analysis_results:
     input:
-        combine_inputs
+        combine_inputs = spatial_targets_core
     output:
-        combined_centrality_scores = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl',
-        combined_nhood_enrichment = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_neighbors_enrichment.pkl",
-        combined_interaction_matrix = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_interaction_matrix.pkl",
-        combined_co_occurrence = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_cooccurrence_probabilities.pkl"
+        combined_centrality_scores = output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl',
+        combined_nhood_enrichment = output_dir_results + f"spatial/combined/core_level/combined_neighbors_enrichment.pkl",
+        combined_interaction_matrix = output_dir_results + f"spatial/combined/core_level/combined_interaction_matrix.pkl",
+        combined_co_occurrence = output_dir_results + f"spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
     params:
-        adata_path = data_dir + f"/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/adata_patches_gex.h5ad",
-        in_dir = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/',
-        out_dir_results = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/',
-        out_dir_plots = output_dir_plots + f'spatial/combined/{patch_size}um_{overlap}um/'
+        adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad",
+        in_dir = output_dir_results + f'spatial/per_sample/',
+        out_dir_results = output_dir_results + f'spatial/combined/core_level/',
+        out_dir_plots = output_dir_plots + f'spatial/combined/core_level/'
     #conda:
     #    "xenium_py310"
     shell:

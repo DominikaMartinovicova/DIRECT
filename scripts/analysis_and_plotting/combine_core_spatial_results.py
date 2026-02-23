@@ -69,7 +69,7 @@ os.makedirs(output_dir_plots, exist_ok=True)
 #--------------------------------------------------------------------------------
 adata = sc.read_h5ad(args.adata)
 print(adata)
-core_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme",'patch', 'T_number']].drop_duplicates().set_index('sample')
+core_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number']].drop_duplicates().set_index('sample')
 print(core_info)
 cores_list = core_info.index.tolist()  #list of cores to combine
 
@@ -85,8 +85,8 @@ nhood_results={}
 interaction_results={}
 cooccurrence_results={}
 for i, core_dir in enumerate(list_dir):   # Loop over all folders and files in the directory
-    core = core_dir.split("/")[-1]
-    print("Reading results from " + core)
+    core = core_dir.split("/")[-2]
+    #print(f"Reading results from {core}")
     for file in os.listdir(core_dir):
         if file.endswith("centrality_scores.csv"):
             file = pd.read_csv(os.path.join(core_dir, file), index_col=0)
@@ -103,8 +103,8 @@ for i, core_dir in enumerate(list_dir):   # Loop over all folders and files in t
             with open(os.path.join(core_dir, file), 'rb') as f:
                 file = pickle.load(f)
             cooccurrence_results[core] = file
-        else:
-            print(f"Skipping over {file}")
+        #else:
+            #print(f"Skipping over {file}")
 
 print("Centrality scores - " + str(len(centrality_results)))
 print("Neighborhood enrichment - " + str(len(nhood_results)))
@@ -185,4 +185,5 @@ for core in cooccurrence_results.keys():
 with open(os.path.join(output_dir_results, 'combined_cooccurrence_probabilities.pkl'), 'wb') as f:
     pickle.dump(combined_cooccurrence_probs, f)
 
+print('Done combining results!')
 
