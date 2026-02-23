@@ -120,6 +120,9 @@ rule gene_expression_analysis:
 
 
 #+++++++++++++++++++++++++++++++++++++++ 3 SPATIALLY ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
+
+#------------------------------------------ patch-level spatial analysis --------------------------------------------
+
 # Divide each piece of tissue into smaller regions (patches) and analyze them separately
 #-------------------------------------------------------------------------------------------------------------------
 checkpoint patching:
@@ -144,23 +147,6 @@ checkpoint patching:
         -o {output.output_dir_patches} \
         --plots_dir {params.plots_dir} \
         """
-
-# Save adata subsets per core or tissue piece for core-level spatial analysis
-#----------------------------------------------------------------
-checkpoint core_level_adata:
-    input:
-        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad" # from utils.preprocess_adata function removed v1.7 samples
-    output:
-        output_dir_patches = directory(data_dir + f'adata_per_sample/{phenotyping_level}/')
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/core_level_adata.py \
-        -i {input.adata} \
-        -o {output.output_dir_patches} \
-        """
-
 
 # Spatial analysis per patch
 #-------------------------------------------------------------------------------------------------------------------
@@ -187,6 +173,51 @@ rule spatial_analysis_per_patch:
         -o_results {output_dir_results}/spatial/per_patch/{patch_size}um_{overlap}um/{wildcards.patch}/ \
         -o_plots {output_dir_plots}/spatial/per_patch/{patch_size}um_{overlap}um/{wildcards.patch}/ \
         """
+
+# Combine spatial analysis results 
+#-------------------------------------------------------------------------------------------------------------------
+rule combine_spatial_analysis_results:
+    input:
+        combine_inputs
+    output:
+        combined_centrality_scores = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl',
+        combined_nhood_enrichment = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_neighbors_enrichment.pkl",
+        combined_interaction_matrix = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_interaction_matrix.pkl",
+        combined_co_occurrence = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_cooccurrence_probabilities.pkl"
+    params:
+        adata_path = data_dir + f"/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/adata_patches_gex.h5ad",
+        in_dir = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/',
+        out_dir_results = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/',
+        out_dir_plots = output_dir_plots + f'spatial/combined/{patch_size}um_{overlap}um/'
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/combine_spatial_results.py \
+        -i {params.in_dir} \
+        --adata {params.adata_path} \
+        -o_results {params.out_dir_results} \
+        -o_plots {params.out_dir_plots} \
+        """
+
+#------------------------------------------ core-level spatial analysis --------------------------------------------
+
+# Save adata subsets per core or tissue piece for core-level spatial analysis
+#----------------------------------------------------------------
+checkpoint core_level_adata:
+    input:
+        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad" # from utils.preprocess_adata function removed v1.7 samples
+    output:
+        output_dir_patches = directory(data_dir + f'adata_per_sample/{phenotyping_level}/')
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/core_level_adata.py \
+        -i {input.adata} \
+        -o {output.output_dir_patches} \
+        """
+
 
 # Spatial analysis per core or tissue piece
 #-------------------------------------------------------------------------------------------------------------------
@@ -217,7 +248,7 @@ rule spatial_analysis_per_core:
 
 # Combine spatial analysis results 
 #-------------------------------------------------------------------------------------------------------------------
-rule combine_spatial_analysis_results:
+rule combine_core_spatial_analysis_results:
     input:
         combine_inputs
     output:
@@ -234,7 +265,7 @@ rule combine_spatial_analysis_results:
     #    "xenium_py310"
     shell:
         """
-        python3 scripts/analysis_and_plotting/combine_spatial_results.py \
+        python3 scripts/analysis_and_plotting/combine_core_spatial_results.py \
         -i {params.in_dir} \
         --adata {params.adata_path} \
         -o_results {params.out_dir_results} \
