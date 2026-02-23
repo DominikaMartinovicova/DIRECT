@@ -63,7 +63,8 @@ print('Exclude v1.7 samples:', exclude_v17)
 rule all:
     input:
         #analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
-        output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl'
+        #output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl'
+        output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -166,7 +167,7 @@ rule spatial_analysis_per_patch:
     #    "xenium_py310"
     shell:
         """
-        python3 scripts/analysis_and_plotting/spatial_analysis.py \
+        python3 scripts/analysis_and_plotting/spatial_analysis_patch_level.py \
         -i {input.adata_patch_subset} \
         --celltype_key {params.celltype_key} \
         --celltype_list {params.celltype_list} \
@@ -193,7 +194,7 @@ rule combine_spatial_analysis_results:
     #    "xenium_py310"
     shell:
         """
-        python3 scripts/analysis_and_plotting/combine_spatial_results.py \
+        python3 scripts/analysis_and_plotting/combine_patch_spatial_results.py \
         -i {params.in_dir} \
         --adata {params.adata_path} \
         -o_results {params.out_dir_results} \
@@ -252,15 +253,14 @@ rule combine_core_spatial_analysis_results:
     input:
         combine_inputs = spatial_targets_core
     output:
-        combined_centrality_scores = output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl',
-        combined_nhood_enrichment = output_dir_results + f"spatial/combined/core_level/combined_neighbors_enrichment.pkl",
-        combined_interaction_matrix = output_dir_results + f"spatial/combined/core_level/combined_interaction_matrix.pkl",
-        combined_co_occurrence = output_dir_results + f"spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
+        combined_centrality_scores = output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
+        combined_nhood_enrichment = output_dir_results + "spatial/combined/core_level/combined_neighbors_enrichment.pkl",
+        combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
+        combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
     params:
         adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad",
-        in_dir = output_dir_results + f'spatial/per_sample/',
-        out_dir_results = output_dir_results + f'spatial/combined/core_level/',
-        out_dir_plots = output_dir_plots + f'spatial/combined/core_level/'
+        in_dir = output_dir_results + 'spatial/per_sample/',
+        out_dir_results = output_dir_results + 'spatial/combined/core_level/'
     #conda:
     #    "xenium_py310"
     shell:
@@ -269,10 +269,32 @@ rule combine_core_spatial_analysis_results:
         -i {params.in_dir} \
         --adata {params.adata_path} \
         -o_results {params.out_dir_results} \
-        -o_plots {params.out_dir_plots} \
         """
 
-
+rule stat_analysis_spatial_core_level:
+    input:
+        combined_centrality_scores = output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
+        combined_nhood_enrichment = output_dir_results + "spatial/combined/core_level/combined_neighbors_enrichment.pkl",
+        combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
+        combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
+    output:
+        stat_results_report = output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+    params:
+        celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
+        in_dir = output_dir_results + 'spatial/combined/core_level/',
+        out_dir_results = output_dir_results + 'spatial/combined/core_level/',
+        out_dir_plots = output_dir_plots + 'spatial/combined/core_level/'
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/stat_analysis_spatial_core.py \
+        -i {params.in_dir} \
+        --celltype_list {params.celltype_list} \
+        -o_report {output.stat_results_report} \
+        -o_results {params.out_dir_results} \
+        -o_plots {params.out_dir_plots} \
+        """
 
 
 

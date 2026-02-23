@@ -3,7 +3,7 @@
 # stat_analysis_spatial_results.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
-#   Analyze and plot combined spatial analysis results across samples.
+#   Analyze and plot combined spatial analysis results across samples (core-/tissue-level).
 #   
 #
 #
@@ -29,6 +29,8 @@ import os
 import pickle
 import argparse
 import squidpy as sq
+from scipy.stats import wilcoxon, ttest_rel, ttest_ind, mannwhitneyu
+from statannotations.Annotator import Annotator
 
 # Parse arguments from commandline
 #--------------------------------------------------------------------------------
@@ -43,9 +45,14 @@ def parse_args():
     parser.add_argument('--celltype_list', help='list of all cell types in the data',
                         dest='celltype_list',
                         type=str)
+    parser.add_argument('--exclude_v17', action='store_true',
+                        help='Exclude v1.7 samples')
     parser.add_argument('-o_report', help='report with stat analysis results',
                         dest='output_dir_report',
                         type=str)
+    parser.add_argument('-o_results', help='path to output dir for results',
+                    dest='output_dir_results',
+                    type=str)
     parser.add_argument('-o_plots', help='path to output dir for plots',
                         dest='output_dir_plots',
                         type=str)
@@ -54,9 +61,10 @@ def parse_args():
 
 args = parse_args()
 input_dir=args.input
-cell_type_list = pd.read_csv(args.celltype_list, header=None)[0].tolist()
+cell_type_list = pd.read_csv(args.celltype_list, header=None, sep='\t')[0].tolist()
 output_dir_report=args.output_dir_report
 output_dir_plots=args.output_dir_plots
+output_dir_results=args.output_dir_results
 
 # Set aesthetics
 sns.set_style("whitegrid")
@@ -64,24 +72,71 @@ sns.set_style("whitegrid")
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Define functions
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-def centrality_shifts(centrality_scores, category):
-    for key in centrality_scores.keys():
-        scores_df = centrality_scores[key]
+# Statistical testing functions
+#--------------------------------------------------------------------------------
+# Perform statistical testing
+def paired_stat_testing(df, cell_fraction_cols, stat_test):
+    # Perform statistical test for each cell type
+    stat_results = []
+    for celltype in cell_fraction_cols:
+        biopsy_values = df[df['sample_type']=='Biopsy'][celltype]
+        resection_values = df[df['sample_type']=='Resection'][celltype]
+        # Ensure paired samples
+        stat, p_value = stat_test(biopsy_values, resection_values)
+        stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
+
+    stat_df = pd.DataFrame(stat_results)
+    print(stat_df)
+
+    # Prepare stat_df for Annotator (expected format to be able to draw asterisks on plot)
+    stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
+    stat_df_annot["group1"] = "Biopsy"
+    stat_df_annot["group2"] = "Resection"
+    stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected format
+    return stat_df, stat_df_annot
+
+# Perform statistical testing for independent samples
+def ind_stat_testing(df, cell_fraction_cols, stat_test, category=None):
+    # Perform statistical test for each cell type
+    stat_results = []
+    for celltype in cell_fraction_cols:
         if category == None:
-            scores_df_melted = scores_df.melt(id_vars=['sample_type'], var_name='cell_type', value_name=key).drop(columns=['MPR'])
+            biopsy_values = df[df['sample_type']=='Biopsy'][celltype]
+            resection_values = df[df['sample_type']=='Resection'][celltype]
+            # Ensure paired samples
+            stat, p_value = stat_test(biopsy_values, resection_values)
+            stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
+            stat_df = pd.DataFrame(stat_results)
+            # Prepare stat_df for Annotator (expected format to be able to draw asterisks on plot)
+            stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
+            stat_df_annot["group1"] = "Biopsy"
+            stat_df_annot["group2"] = "Resection"
+            stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected forma
+        else:
+            categories = df[category].unique()
+            subset_1 = df[df[category] == categories[0]][celltype]
+            subset_2 = df[df[category] == categories[1]][celltype]
+            stat, p_value = stat_test(subset_1, subset_2)
+            stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
+            stat_df = pd.DataFrame(stat_results)   
+            stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
+            stat_df_annot["group1"] = categories[0]
+            stat_df_annot["group2"] = categories[1]
+            stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected forma
+    print(stat_df)
+    return stat_df, stat_df_annot
 
 
-def stat_analysis_centrality_scores(input_file, output_dir_report, output_dir_plots, category):
+def stat_analysis_centrality_scores_box(input_file, output_dir_report, output_dir_plots, category, exclude_v17, immune):
     # Centrality scores analysis and plotting
     #------------------------------------------------------------------------------
     centrality_scores = input_file
-    print(centrality_scores.keys())
+    os.makedirs(os.path.join(output_dir_plots, 'centrality_scores'), exist_ok=True)
     for key in centrality_scores.keys():
         if category == None:
             scores_df = centrality_scores[key].drop(columns=['MPR'])
             scores_df_melted = scores_df.melt(id_vars=['sample_type'], var_name='cell_type', value_name=key)
-            plt.figure(figsize=(30,22))
-            g=sns.catplot(scores_df_melted, x='cell_type', y=key, hue='sample_type', kind='box', palette='tab20')
+            g=sns.catplot(scores_df_melted, x='cell_type', y=key, hue='sample_type', kind='box', palette='tab20', height=8, aspect=1.5)
             plt.title(f'Centrality scores: {key}')
             plt.xticks(rotation=90)
             plt.xlabel('Cell type')
@@ -89,13 +144,13 @@ def stat_analysis_centrality_scores(input_file, output_dir_report, output_dir_pl
             g.legend.set_title('Sample type')
             g.legend.set_loc('upper right')
             plt.tight_layout()
-            plt.savefig(os.path.join(output_dir_plots, f'centrality_scores/{key}.svg'), format='svg', bbox_inches='tight')
+            plt.savefig(os.path.join(output_dir_plots, f'centrality_scores/{key}_box.svg'), format='svg', bbox_inches='tight')
             plt.close()
         elif category != None:
             scores_df = centrality_scores[key]
             scores_df_melted = scores_df.melt(id_vars=['sample_type', category], var_name='cell_type', value_name=key)
-            plt.figure(figsize=(30,22))
-            g=sns.catplot(scores_df_melted, x='cell_type', y=key, hue='sample_type', col=category, kind='box', palette='tab20')
+            plt.figure(figsize=(45,35))
+            g=sns.catplot(scores_df_melted, x='cell_type', y=key, hue='sample_type', col=category, kind='box', palette='tab20', height=6, aspect=1.5)
             g.set_xticklabels(rotation=90)
             g.set_xlabels('Cell type')
             g.set_ylabels(f'{key} score')
@@ -103,10 +158,89 @@ def stat_analysis_centrality_scores(input_file, output_dir_report, output_dir_pl
             g.legend.set_title('Sample type')
             g.legend.set_loc('upper right')
             plt.tight_layout()
-            plt.savefig(os.path.join(output_dir_plots, f'centrality_scores/{key}_by_{category}.svg'), format='svg', bbox_inches='tight')
+            plt.savefig(os.path.join(output_dir_plots, f'centrality_scores/{key}_by_{category}_box.svg'), format='svg', bbox_inches='tight')
             plt.close()
 
-def stat_analysis_heatmaps(spatial_analysis, output_dir_plots, category, cell_types):
+
+def stat_analysis_centrality_scores_line(input_file, output_dir_report, output_dir_plots, category, exclude_v17, immune, stat_test):
+    centrality_scores = input_file
+    os.makedirs(os.path.join(output_dir_plots, 'centrality_scores'), exist_ok=True)
+
+    for key in centrality_scores.keys():
+        # Calculate average scores per 'replicates' (e.g. per patient) and plot lines connecting them
+        df = centrality_scores[key].groupby(['sample_type', 'pt_id']).mean(numeric_only=True).reset_index()
+        
+        # remove pt_ids with NaNs in any of the cell types to be plotted
+        unpaired_sample = df.pt_id[df.isna().any(axis=1)].tolist()
+        pairs_df = df[~df.pt_id.isin(unpaired_sample)].copy()  # DataFrame with only paired samples to be plotted and tested
+        print(pairs_df)
+
+        if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
+            cell_fraction_cols = sorted([col for col in pairs_df.columns if col not in ['sample_type', 'MPR', 'pt_id']])
+            scores_df_melted = pairs_df.melt(id_vars=['pt_id', 'sample_type'], value_vars=cell_fraction_cols, var_name='cell_type', value_name=key)
+            #scores_df_melted['variable'] = scores_df_melted['cell_type']
+        
+            # Plot stripplot with lines connecting paired samples
+            plt.figure(figsize=(12,6))
+            ax = sns.stripplot(data = scores_df_melted, x = 'cell_type', y = key, hue='sample_type',hue_order=['Biopsy', 'Resection'], dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
+            
+            # Prepare the data for line plotting
+            wide = scores_df_melted.pivot_table(index='pt_id', columns=['cell_type', 'sample_type'], values=key)
+            categories = scores_df_melted['cell_type'].unique()
+            xticks = ax.get_xticks()
+            x_map = dict(zip(categories, xticks))
+            offset = 0.18 # offset for biopsy vs resection points
+
+            # Draw lines connecting paired samples
+            for celltype in categories:
+                sub = wide[celltype].dropna()
+                for _, row in sub.iterrows():
+                    x_left = x_map[celltype] - offset   # biopsy x-position
+                    x_right = x_map[celltype] + offset  # resection x-position
+                    y_bio = row['Biopsy']
+                    y_res = row['Resection']
+                    color = 'blue' if y_res > y_bio else 'red'
+                    ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
+            
+            stat_df, stat_df_annot = paired_stat_testing(pairs_df, cell_fraction_cols, stat_test)
+            if immune==False and exclude_v17==False:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_w_v1.7.csv', index=False)
+                plt.title(f"{key} in Biopsy vs Resection ({stat_test.__name__})")
+                file_name =  f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_w_v1.7.svg'
+            elif immune==True and exclude_v17==False:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_immune_{key}_statistical_results_w_v1.7.csv', index=False)
+                plt.title(f"Immune {key} in Biopsy vs Resection ({stat_test.__name__})")
+                file_name = f'{output_dir_plots}centrality_scores/immune_{key}_shifts_lineplot_{stat_test.__name__}_w_v1.7.svg'
+            elif immune==False and exclude_v17==True:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_wo_v1.7.csv', index=False)
+                plt.title(f"{key} in Biopsy vs Resection (excluding v1.7 treatment scheme) ({stat_test.__name__})")
+                file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_wo_v1.7.svg'
+            elif immune==True and exclude_v17==True:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_immune_{key}_statistical_results_wo_v1.7.csv', index=False)
+                plt.title(f"Immune {key} in Biopsy vs Resection (excluding v1.7 treatment scheme) ({stat_test.__name__})")
+                file_name = f'{output_dir_plots}centrality_scores/immune_{key}_shifts_lineplot_{stat_test.__name__}_wo_v1.7.svg'
+
+            # Generate pairs for significant comparisons only
+            alpha = 0.05
+            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+            if len(sig_df) > 1:
+                pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+                annot = Annotator(ax, pairs, data=scores_df_melted, x='cell_type', y=key, hue='sample_type')
+                annot.configure(text_format="star")
+                annot.set_pvalues_and_annotate(sig_df['pval'])
+            else:
+                print(f"No significant differences found for {key} with {stat_test.__name__}. No asterisks will be added to the plot.")
+
+            plt.xticks(rotation=45, ha='right')
+            plt.xlabel("Cell Type")
+            plt.ylabel(key)
+            plt.legend(title='Sample Type')
+            plt.tight_layout()
+            plt.savefig(file_name, format='svg', bbox_inches='tight')
+            plt.close()
+
+
+def stat_analysis_heatmaps(spatial_analysis, output_dir_plots, category, cell_types, exclude_v17, immune):
     # Heatmaps for neighborhood_enrichment and interaction matrices
     #------------------------------------------------------------------------------
     input_file, analysis = spatial_analysis
@@ -168,12 +302,12 @@ def stat_analysis_heatmaps(spatial_analysis, output_dir_plots, category, cell_ty
             plt.savefig(os.path.join(output_dir_plots, f'{name_of_analysis}/difference_{name_of_analysis}_{group_name.replace(" ", "_")}.svg'), format='svg', bbox_inches='tight')
             plt.close()
 
-def stat_analysis_cooccurrence(input_file, output_dir_plots, category, cells_of_interest):
+def stat_analysis_cooccurrence(input_file, output_dir_plots, category, cells_of_interest, exclude_v17, immune):
     # Co-occurrence analysis and plotting
     #------------------------------------------------------------------------------
     biopsy_samples = []
     resection_samples = []
-    
+    os.makedirs(os.path.join(output_dir_plots, 'co_occurrence_probabilities'), exist_ok=True)
     for sample in input_file.keys():
         if input_file[sample]['sample_type']=='Biopsy':
             biopsy_samples.append(sample)
@@ -193,9 +327,6 @@ def stat_analysis_cooccurrence(input_file, output_dir_plots, category, cells_of_
             resection_lowMPR_samples.append(sample)
         elif input_file[sample]['sample_type']=='Resection' and input_file[sample]['MPR']=='>=90':
             resection_highMPR_samples.append(sample)
-
-
-            
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -222,10 +353,11 @@ with open(coocurrence_path, 'rb') as f:
 analyses = [(nhood_enrichment, 'zscore'), (interaction_matrices, 'matrix')]
 categories = [None, 'MPR']
 for category in categories:
-    #stat_analysis_centrality_scores(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, category=category)
-    stat_analysis_cooccurrence(input_file=cooccurrence_matrices, output_dir_plots=output_dir_plots, category=category, cells_of_interest=['B cells', 'Plasma cells'])
-    for analysis in analyses:
-        #stat_analysis_heatmaps(spatial_analysis = analysis, output_dir_plots=output_dir_plots, category=category, cell_types=cell_type_list)
+    #stat_analysis_centrality_scores_box(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, category=category, exclude_v17=args.exclude_v17, immune=False)
+    stat_analysis_centrality_scores_line(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, category=category, exclude_v17=args.exclude_v17, immune=False, stat_test=wilcoxon)
+    #stat_analysis_cooccurrence(input_file=cooccurrence_matrices, output_dir_plots=output_dir_plots, category=category, cells_of_interest=['B cells', 'Plasma cells'], exclude_v17=args.exclude_v17, immune=False)
+    #for analysis in analyses:
+        #stat_analysis_heatmaps(spatial_analysis = analysis, output_dir_plots=output_dir_plots, category=category, cell_types=cell_type_list, exclude_v17=args.exclude_v17, immune=False)
 
 
 

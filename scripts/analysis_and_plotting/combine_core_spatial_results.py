@@ -45,9 +45,6 @@ def parse_args():
     parser.add_argument('-o_results', help='path to output dir for results',
                         dest='output_dir_results',
                         type=str)
-    parser.add_argument('-o_plots', help='path to output dir for plots',
-                        dest='output_dir_plots',
-                        type=str)
     # parser.add_argument('--samples_list', help='list of samples to combine',
     #                     dest='samples_list',
     #                     type=str)
@@ -56,11 +53,8 @@ def parse_args():
 
 args = parse_args()
 
-
 output_dir_results=args.output_dir_results
-output_dir_plots=args.output_dir_plots
 os.makedirs(output_dir_results, exist_ok=True)
-os.makedirs(output_dir_plots, exist_ok=True)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Sort samples to groups for comparison 
@@ -69,7 +63,7 @@ os.makedirs(output_dir_plots, exist_ok=True)
 #--------------------------------------------------------------------------------
 adata = sc.read_h5ad(args.adata)
 print(adata)
-core_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number']].drop_duplicates().set_index('sample')
+core_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number','pt_id']].drop_duplicates().set_index('sample')
 print(core_info)
 cores_list = core_info.index.tolist()  #list of cores to combine
 
@@ -136,13 +130,13 @@ for core in centrality_results.keys():
 
 # Add sample info
 degree_centrality_scores = degree_centrality_scores.transpose()
-degree_centrality_scores = degree_centrality_scores.join(core_info[['sample_type', 'MPR']], how='left')
+degree_centrality_scores = degree_centrality_scores.join(core_info[['sample_type', 'MPR', 'pt_id']], how='left')
 
 average_clustering_scores = average_clustering_scores.transpose()
-average_clustering_scores = average_clustering_scores.join(core_info[['sample_type', 'MPR']], how='left')
+average_clustering_scores = average_clustering_scores.join(core_info[['sample_type', 'MPR', 'pt_id']], how='left')
 
 closeness_centrality_scores = closeness_centrality_scores.transpose()
-closeness_centrality_scores = closeness_centrality_scores.join(core_info[['sample_type', 'MPR']], how='left')
+closeness_centrality_scores = closeness_centrality_scores.join(core_info[['sample_type', 'MPR', 'pt_id']], how='left')
 
 combined_centrality_scores = {'degree_centrality': degree_centrality_scores,'average_clustering': average_clustering_scores,'closeness_centrality': closeness_centrality_scores}
 with open(os.path.join(output_dir_results, 'combined_centrality_scores.pkl'), 'wb') as f:
@@ -157,6 +151,7 @@ for core in nhood_results.keys():
     combined_nhood_enrichment[core] = nhood_results[core]
     combined_nhood_enrichment[core]['sample_type'] = core_info.loc[core, 'sample_type']
     combined_nhood_enrichment[core]['MPR'] = core_info.loc[core, 'MPR']
+    combined_nhood_enrichment[core]['pt_id'] = core_info.loc[core, 'pt_id']
 #print(combined_nhood_enrichment)
 with open(os.path.join(output_dir_results, 'combined_neighbors_enrichment.pkl'), 'wb') as f:
     pickle.dump(combined_nhood_enrichment, f)
@@ -181,6 +176,7 @@ for core in cooccurrence_results.keys():
     combined_cooccurrence_probs[core] = cooccurrence_results[core]
     combined_cooccurrence_probs[core]['sample_type'] = core_info.loc[core, 'sample_type']
     combined_cooccurrence_probs[core]['MPR'] = core_info.loc[core, 'MPR']
+    combined_cooccurrence_probs[core]['pt_id'] = core_info.loc[core, 'pt_id']
 #print(combined_cooccurrence_probs)
 with open(os.path.join(output_dir_results, 'combined_cooccurrence_probabilities.pkl'), 'wb') as f:
     pickle.dump(combined_cooccurrence_probs, f)
