@@ -14,7 +14,7 @@ def spatial_targets(wildcards):
 
 def get_cores(wildcards):
     ckpts = checkpoints.core_level_adata.get()
-    core_files = glob.glob(f'{ckpts.output.output_dir_patches}/T*.h5ad')
+    core_files = glob.glob(f'{ckpts.output.output_dir_cores}/T*.h5ad')
     return [file.split('/')[-1].replace('.h5ad','') for file in core_files]
 
 def spatial_targets_core(wildcards):
@@ -40,7 +40,7 @@ def combine_inputs(wildcards):
 #-------------------------------------------------------------------------------------------------------------------
 data_dir = 'data/'
 log_dir = 'logs/analysis/'
-exclude_v17 = False
+exclude_v17 = True
 if exclude_v17:
     ex_v17 = "wo_v1.7"
 elif not exclude_v17:
@@ -207,16 +207,16 @@ rule combine_spatial_analysis_results:
 #----------------------------------------------------------------
 checkpoint core_level_adata:
     input:
-        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad" # from utils.preprocess_adata function removed v1.7 samples
+        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_w_v1.7.h5ad" # from utils.preprocess_adata function removed v1.7 samples
     output:
-        output_dir_patches = directory(data_dir + f'adata_per_sample/{phenotyping_level}/')
+        output_dir_cores = directory(data_dir + f'adata_per_sample/{phenotyping_level}/')
     #conda:
     #    "xenium_py310"
     shell:
         """
         python3 scripts/analysis_and_plotting/core_level_adata.py \
         -i {input.adata} \
-        -o {output.output_dir_patches} \
+        -o {output.output_dir_cores} \
         """
 
 
@@ -258,7 +258,7 @@ rule combine_core_spatial_analysis_results:
         combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
         combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
     params:
-        adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad",
+        adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis_w_v1.7.h5ad",
         in_dir = output_dir_results + 'spatial/per_sample/',
         out_dir_results = output_dir_results + 'spatial/combined/core_level/'
     #conda:
@@ -271,35 +271,60 @@ rule combine_core_spatial_analysis_results:
         -o_results {params.out_dir_results} \
         """
 
-rule stat_analysis_spatial_core_level:
+rule stat_analysis_centrality_core_level:
     input:
-        combined_centrality_scores = output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
-        combined_nhood_enrichment = output_dir_results + "spatial/combined/core_level/combined_neighbors_enrichment.pkl",
-        combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
-        combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
+        combined_centrality_scores = output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
     output:
         stat_results_report = output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
     params:
         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
         in_dir = output_dir_results + 'spatial/combined/core_level/',
         out_dir_results = output_dir_results + 'spatial/combined/core_level/',
-        out_dir_plots = output_dir_plots + 'spatial/combined/core_level/'
+        out_dir_plots = output_dir_plots + 'spatial/combined/core_level/',
+        exclude_flag = "--exclude_v17" if exclude_v17 else ""
     #conda:
     #    "xenium_py310"
     shell:
         """
-        python3 scripts/analysis_and_plotting/stat_analysis_spatial_core.py \
+        python3 scripts/analysis_and_plotting/stat_analysis_centrality_core.py \
         -i {params.in_dir} \
         --celltype_list {params.celltype_list} \
+        {params.exclude_flag} \
         -o_report {output.stat_results_report} \
         -o_results {params.out_dir_results} \
         -o_plots {params.out_dir_plots} \
         """
 
 
+# rule stat_analysis_nhood_core_level:
+#     input:
+#         combined_nhood_enrichment = output_dir_results + 'spatial/combined/core_level/combined_neighbors_enrichment.pkl'
+#     output:
+#         stat_results_report = output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+#     params:
+#         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
+#         in_dir = output_dir_results + 'spatial/combined/core_level/',
+#         out_dir_results = output_dir_results + 'spatial/combined/core_level/',
+#         out_dir_plots = output_dir_plots + 'spatial/combined/core_level/',
+#         exclude_flag = "--exclude_v17" if exclude_v17 else ""
+#     #conda:
+#     #    "xenium_py310"
+#     shell:
+#         """
+#         python3 scripts/analysis_and_plotting/stat_analysis_nhood_core.py \
+#         -i {params.in_dir} \
+#         --celltype_list {params.celltype_list} \
+#         {params.exclude_flag} \
+#         -o_report {output.stat_results_report} \
+#         -o_results {params.out_dir_results} \
+#         -o_plots {params.out_dir_plots} \
+#         """
 
 
 
+
+        # combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
+        # combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
 
 
 
