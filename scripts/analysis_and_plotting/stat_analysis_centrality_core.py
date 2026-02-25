@@ -226,15 +226,21 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_report, output_d
     centrality_scores = input_file
     for key in centrality_scores.keys():
         if exclude_v17==True:
-            centrality_scores[key] = centrality_scores[key][~centrality_scores[key]['treatment_scheme'].str.contains('v1.7')]
-        category_map = centrality_scores[key][[category, 'pt_id', ]].drop_duplicates() if category in ['MPR', 'treatment'] else centrality_scores[key][['pt_id']].drop_duplicates()
+            df = centrality_scores[key][~centrality_scores[key]['treatment_scheme'].str.contains('v1.7')]
+        else:
+            df = centrality_scores[key]
+        category_map = df[[category, 'pt_id', ]].drop_duplicates() if category in ['MPR', 'treatment'] else df[['pt_id']].drop_duplicates()
         # Calculate average scores per 'replicates' (e.g. per patient) and plot lines connecting them
-        df = centrality_scores[key].groupby(['sample_type', 'pt_id']).mean(numeric_only=True).reset_index()
-        df = df.merge(category_map, on=['pt_id'], how='left')
+        df = df.groupby(['sample_type', 'pt_id']).mean(numeric_only=True).reset_index()
+        df = df.merge(category_map, on=['pt_id'], how='right')
         
-        # remove pt_ids with NaNs in any of the cell types to be plotted
-        unpaired_sample = df.pt_id[df.isna().any(axis=1)].tolist()
-        pairs_df = df[~df.pt_id.isin(unpaired_sample)].copy()  # DataFrame with only paired samples to be plotted and tested
+        # Keep only patients with matched biopsy and resection samples
+        resection_pts = df[df['sample_type']=='Resection']['pt_id'].tolist()
+        biopsy_pts = df[df['sample_type']=='Biopsy']['pt_id'].tolist()
+        paired_pts = list(set(resection_pts) & set(biopsy_pts))
+        pairs_df = df[df['pt_id'].isin(paired_pts)]
+        print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+
         if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
             scores_df_melted = pairs_df.melt(id_vars=['pt_id', 'sample_type'], value_vars=cell_type_list, var_name='cell_type', value_name=key)
             #scores_df_melted['variable'] = scores_df_melted['cell_type']
@@ -399,11 +405,12 @@ def stat_analysis_centrality_scores_shift_box(input_file, output_dir_report, out
             df = centrality_scores[key]
 
         print(df)
-        category_map = df[[category, 'pt_id', ]].drop_duplicates() if category in ['MPR', 'treatment'] else centrality_scores[key][['pt_id']].drop_duplicates()
+        print(df.pt_id.unique())
+        category_map = df[[category, 'pt_id', ]].drop_duplicates() if category in ['MPR', 'treatment'] else df[['pt_id']].drop_duplicates()
         print(category_map)
 
-        df = centrality_scores[key].groupby(['sample_type', 'pt_id']).mean(numeric_only=True).reset_index()
-        df = df.merge(category_map, on=['pt_id'], how='left')
+        df = df.groupby(['sample_type', 'pt_id']).mean(numeric_only=True).reset_index()
+        df = df.merge(category_map, on=['pt_id'], how='right')
         print(df)
         
         # remove pt_ids that do not have a pair (i.e. missing either in biopsy or resection) 
@@ -502,14 +509,14 @@ else:
     categories = [None, 'MPR', 'treatment']
 
 for category in categories:
-    #stat_analysis_centrality_scores_box(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
-    #stat_analysis_centrality_scores_line(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list)
+    stat_analysis_centrality_scores_box(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
+    stat_analysis_centrality_scores_line(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list)
     stat_analysis_centrality_scores_shift_box(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
 
 categories_within_sampletype = ['MPR', 'treatment'] if exclude_v17==False else ['MPR']
-#for sample_type in ['Biopsy', 'Resection']:
-    #for category in categories_within_sampletype:
-        #stat_analysis_centrality_scores_within_sampletype_box(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, sample_type=sample_type, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
+for sample_type in ['Biopsy', 'Resection']:
+    for category in categories_within_sampletype:
+        stat_analysis_centrality_scores_within_sampletype_box(input_file=centrality_scores, output_dir_report=output_dir_report, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, sample_type=sample_type, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
     
     
     
