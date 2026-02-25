@@ -232,7 +232,7 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_report, output_d
         category_map = df[[category, 'pt_id', ]].drop_duplicates() if category in ['MPR', 'treatment'] else df[['pt_id']].drop_duplicates()
         # Calculate average scores per 'replicates' (e.g. per patient) and plot lines connecting them
         df = df.groupby(['sample_type', 'pt_id']).mean(numeric_only=True).reset_index()
-        df = df.merge(category_map, on=['pt_id'], how='right')
+        
         
         # Keep only patients with matched biopsy and resection samples
         resection_pts = df[df['sample_type']=='Resection']['pt_id'].tolist()
@@ -240,6 +240,8 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_report, output_d
         paired_pts = list(set(resection_pts) & set(biopsy_pts))
         pairs_df = df[df['pt_id'].isin(paired_pts)]
         print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+
+        pairs_df = pairs_df.merge(category_map, on=['pt_id'], how='left')
 
         if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
             scores_df_melted = pairs_df.melt(id_vars=['pt_id', 'sample_type'], value_vars=cell_type_list, var_name='cell_type', value_name=key)
@@ -410,8 +412,7 @@ def stat_analysis_centrality_scores_shift_box(input_file, output_dir_report, out
         print(category_map)
 
         df = df.groupby(['sample_type', 'pt_id']).mean(numeric_only=True).reset_index()
-        df = df.merge(category_map, on=['pt_id'], how='right')
-        print(df)
+
         
         # remove pt_ids that do not have a pair (i.e. missing either in biopsy or resection) 
         # (ignore the NaNs in cell type columns for now, we will remove those later to keep as many samples as possible for the analysis of other cell types that do not have NaNs)
@@ -421,6 +422,9 @@ def stat_analysis_centrality_scores_shift_box(input_file, output_dir_report, out
         paired_pts = list(set(resection_pts) & set(biopsy_pts))
         paired_fractions_df = df[df['pt_id'].isin(paired_pts)]
         print(f'Number of paired patients: {len(paired_fractions_df["pt_id"].unique())}')
+        
+        paired_fractions_df = paired_fractions_df.merge(category_map, on=['pt_id'], how='left')
+        print(paired_fractions_df)
 
         biopsy_df = paired_fractions_df[paired_fractions_df['sample_type']=='Biopsy']
         biopsy_fractions = biopsy_df[cell_type_list].set_index(biopsy_df['pt_id'])
