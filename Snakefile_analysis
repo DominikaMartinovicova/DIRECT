@@ -40,7 +40,7 @@ def combine_inputs(wildcards):
 #-------------------------------------------------------------------------------------------------------------------
 data_dir = 'data/'
 log_dir = 'logs/analysis/'
-exclude_v17 = False
+exclude_v17 = True
 if exclude_v17:
     ex_v17 = "wo_v1.7"
 elif not exclude_v17:
@@ -64,7 +64,8 @@ rule all:
     input:
         #analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
         #output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl'
-        output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+        #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+        data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++

@@ -472,6 +472,96 @@ def celltype_fraction_shifts_box(df, output_dir, output_dir_results, exclude_v17
         plt.savefig(file_name, format='svg')
         plt.close()
 
+# Calculate fold change between resection and biopsy for each pair
+def celltype_fraction_shifts_foldchange(df, output_dir, output_dir_results, exclude_v17, category=None, stat_test=ttest_ind, perform_stat_test=False, immune=False):
+    cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
+    biopsy_df = df[df['sample_type']=='Biopsy']
+    biopsy_fractions = biopsy_df[cell_fraction_cols].set_index(biopsy_df['pt_id'])
+    resection_df = df[df['sample_type']=='Resection']
+    resection_fractions = resection_df[cell_fraction_cols].set_index(resection_df['pt_id']).reindex(biopsy_fractions.index)
+
+    if category == None:
+        # Calculate fold change: resection / biopsy (add pseudocount to avoid division by zero)
+        fc_df = (resection_fractions + 1e-6) / (biopsy_fractions + 1e-6)
+        fc_df.columns = fc_df.columns.str.replace(' fraction','')
+        fc_df_log = np.log2(fc_df)  # Log2 transform for better visualization
+        plt.figure(figsize=(12, 6))
+        sns.boxplot(fc_df_log)
+
+        if immune==False and exclude_v17==False:
+            plt.title("Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection")
+            file_name = f'{output_dir}celltype_fraction_foldchange_box_w_v1.7.svg'
+        elif immune==False and exclude_v17==True:
+            plt.title("Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection (excluding v1.7 treatment scheme)")
+            file_name = f'{output_dir}celltype_fraction_foldchange_box_wo_v1.7.svg'
+        elif immune==True and exclude_v17==False:
+            plt.title("Immune Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection")
+            file_name = f'{output_dir}immune_celltype_fraction_foldchange_box_w_v1.7.svg'
+        else:
+            plt.title("Immune Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection (excluding v1.7 treatment scheme)")
+            file_name = f'{output_dir}immune_celltype_fraction_foldchange_box_wo_v1.7.svg'
+        plt.axhline(y=0, color='red', linestyle='--', linewidth=1, label='No change')
+        plt.xticks(rotation=45, ha='right')
+        plt.xlabel("Cell Type")
+        plt.ylabel("Log2 Fold Change (Resection / Biopsy)")
+        plt.tight_layout()
+        plt.savefig(file_name, format='svg')
+        plt.close()
+
+    elif category != None:
+        # Calculate fold change
+        fc_df = (resection_fractions + 1e-6) / (biopsy_fractions + 1e-6)
+        fc_df[category] = fc_df.index.map(biopsy_df.set_index('pt_id')[category])
+        fc_df_log = np.log2(fc_df[cell_fraction_cols])
+        fc_df_log[category] = fc_df[category]
+        fc_df_melted = pd.melt(fc_df_log, id_vars=[category], value_vars=cell_fraction_cols)
+        fc_df_melted['variable'] = fc_df_melted['variable'].str.replace(' fraction','')
+
+        cat_order = sorted(fc_df_melted[category].dropna().unique())
+        fc_df_melted[category] = pd.Categorical(fc_df_melted[category], categories=cat_order, ordered=True)
+
+        plt.figure(figsize=(12, 6))
+        ax = sns.boxplot(data=fc_df_melted, x="variable", y="value", hue=category, palette='tab20')
+        plt.axhline(y=0, color='red', linestyle='--', linewidth=1, label='No change')
+
+        if perform_stat_test == True:
+            stat_df, stat_df_annot = ind_stat_testing(fc_df_log, cell_fraction_cols, stat_test, category)
+            if immune==False and exclude_v17==False:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_celltype_fraction_foldchange_statistical_results_w_v1.7.csv', index=False)
+                plt.title(f"Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection ({stat_test.__name__})")
+                file_name = f'{output_dir}{category}_celltype_fraction_foldchange_box_{stat_test.__name__}_w_v1.7.svg'
+            elif immune==True and exclude_v17==False:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_immune_celltype_fraction_foldchange_statistical_results_w_v1.7.csv', index=False)
+                plt.title(f"Immune Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection ({stat_test.__name__})")
+                file_name = f'{output_dir}{category}_immune_celltype_fraction_foldchange_box_{stat_test.__name__}_w_v1.7.svg'
+            elif immune==False and exclude_v17==True:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_celltype_fraction_foldchange_statistical_results_wo_v1.7.csv', index=False)
+                plt.title(f"Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection (excluding v1.7 treatment scheme) ({stat_test.__name__})")
+                file_name = f'{output_dir}{category}_celltype_fraction_foldchange_box_{stat_test.__name__}_wo_v1.7.svg'
+            elif immune==True and exclude_v17==True:
+                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_immune_celltype_fraction_foldchange_statistical_results_wo_v1.7.csv', index=False)
+                plt.title(f"Immune Cell Type Fraction Fold Change (Log2) in Biopsy vs Resection (excluding v1.7 treatment scheme) ({stat_test.__name__})")
+                file_name = f'{output_dir}{category}_immune_celltype_fraction_foldchange_box_{stat_test.__name__}_wo_v1.7.svg'
+            
+            # Generate pairs for significant comparisons only
+            alpha = 0.05
+            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+            if sig_df.empty:
+                print(f"No significant results for category: {category} — skipping annotation.")
+            else:
+                pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+                annot = Annotator(ax, pairs, data=fc_df_melted, x='variable', y='value', hue=category)
+                annot.configure(text_format="star")
+                annot.set_pvalues_and_annotate(sig_df['pval'])
+
+        plt.xticks(rotation=45, ha='right')
+        plt.xlabel("Cell Type")
+        plt.ylabel("Log2 Fold Change (Resection / Biopsy)")
+        plt.tight_layout()
+        plt.savefig(file_name, format='svg')
+        plt.close()
+
+
 # Analyze compositions of cell type fractions in biopsy/resection, split into groups based on chosen category, as boxplots
 #--------------------------------------------------------------------------------
 def composition_within_sampletype_box(df, output_dir, output_dir_results, exclude_v17, category, sample_type, stat_test=mannwhitneyu, perform_stat_test=False, immune=False):
@@ -537,7 +627,7 @@ def paired_stat_testing(df, cell_fraction_cols, stat_test):
         stat_results.append({'cell_type': celltype.replace(' fraction',''), 'statistic': stat, 'p_value': p_value})
 
     stat_df = pd.DataFrame(stat_results)
-    print(stat_df)
+    #print(stat_df)
 
     # Prepare stat_df for Annotator (expected format to be able to draw asterisks on plot)
     stat_df_annot = stat_df.rename(columns={"cell_type": "variable", "p_value": "pval"})
@@ -574,7 +664,7 @@ def ind_stat_testing(df, cell_fraction_cols, stat_test, category=None):
             stat_df_annot["group1"] = categories[0]
             stat_df_annot["group2"] = categories[1]
             stat_df_annot = stat_df_annot[["variable", "group1", "group2", "pval"]] # Reorder columns to expected forma
-    print(stat_df)
+    #print(stat_df)
     return stat_df, stat_df_annot
 
 
@@ -590,7 +680,7 @@ for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
     fractions_df = pd.concat([fractions_df, temp_fractions.rename(element)], axis=1) # Save fractions to df
 
     # Add metadata to the fractions_df
-    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme', 'MPR', 'treatment'] #'structure',
+    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme', 'MPR', 'treatment', 'structure']
     for meta in meta_list: 
         fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
 
@@ -623,12 +713,12 @@ for category in categories:
     celltype_fraction_shifts_lineplot(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
     celltype_fraction_composition_box(fractions_df, output_dir, output_dir_results, category = category, exclude_v17=exclude_v17, immune=False, stat_test = mannwhitneyu, perform_stat_test=True)
     celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-    if category != None:
-        for sample_type in sample_types:
-            sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
-            composition_within_sampletype_box(sample_type_df, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-
-
+    celltype_fraction_shifts_foldchange(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    for sample_type in sample_types:
+        sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
+        if category != None:
+                composition_within_sampletype_box(sample_type_df, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+            
 # Focus on immune cell types only
 #--------------------------------------------------------------------------------
 non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
@@ -638,15 +728,15 @@ df_only_immune = paired_fractions_df.drop(labels=to_exclude, axis=1)
 
 df_only_immune = df_only_immune[df_only_immune.columns[df_only_immune.columns.str.contains(' fraction')]]  # only keep columns that have ' fraction' in their name
 df_immune = df_only_immune.div(df_only_immune.sum(axis=1), axis=0)  # Re-normalize to sum to 1
-df_immune[['pt_id', 'sample_type', 'MPR', 'treatment']] = paired_fractions_df[['pt_id', 'sample_type', 'MPR', 'treatment']].values # Add metadata back
+df_immune[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure']] = paired_fractions_df[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure']].values # Add metadata back
 print(df_immune.head())
-sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
 
 for category in categories:    
     celltype_fraction_shifts_lineplot(df_immune, output_dir,output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=True,exclude_v17=exclude_v17)
     celltype_fraction_composition_box(df_immune, output_dir, output_dir_results, category = category, immune=True, exclude_v17=exclude_v17, stat_test = mannwhitneyu, perform_stat_test=True)
     celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
-    if category != None:
-        for sample_type in sample_types:
-            sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
+    celltype_fraction_shifts_foldchange(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    for sample_type in sample_types:
+        sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
+        if category != None:
             composition_within_sampletype_box(sample_type_df_immune, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
