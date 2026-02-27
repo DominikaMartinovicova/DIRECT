@@ -98,13 +98,17 @@ print(adata)
 def celltype_fraction_composition_by_structure(df, output_dir, output_dir_results, exclude_v17, category=None, structure_col=None, stat_test=mannwhitneyu, perform_stat_test=False, immune=False):
     #print(df)
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
-    
+    if structure_col is 'structure_core':
+        order=['core_1', 'core_2', 'core_3']
+    else:
+        None
+        
     if category is None:
         # Plot all structures together
         plt.figure(figsize=(14, 6))
         df_melted = pd.melt(df, id_vars=['pt_id', structure_col], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction', '')
-        ax = sns.boxplot(data=df_melted, x="variable", y="value", hue=structure_col, palette='tab20')
+        ax = sns.boxplot(data=df_melted, x="variable", y="value", hue=structure_col, hue_order=order palette='tab20')
         
         title_prefix = "Immune Cell Type" if immune else "Cell Type"
         title_suffix = " (excluding v1.7 treatment scheme)" if exclude_v17 else ""
@@ -137,6 +141,7 @@ def celltype_fraction_composition_by_structure(df, output_dir, output_dir_result
             ax.set_ylabel("Fraction")
         
         file_name = f'{output_dir}{category}_{"immune_" if immune else ""}celltype_fraction_by_{structure_col}{"_wo_v1.7" if exclude_v17 else "_w_v1.7"}.svg'
+        g.legend.set_loc('upper right')
         plt.tight_layout()
         plt.savefig(file_name, format='svg', bbox_inches='tight')
         plt.close()
