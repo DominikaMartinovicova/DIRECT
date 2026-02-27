@@ -92,32 +92,29 @@ print('Reading data...')
 adata = sc.read_h5ad(args.input)
 print(adata)
 
-
-
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Define functions for analyses
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-def celltype_fraction_composition_by_structure(df, output_dir, output_dir_results, exclude_v17, category=None, stat_test=mannwhitneyu, perform_stat_test=False, immune=False):
-    print(df)
+def celltype_fraction_composition_by_structure(df, output_dir, output_dir_results, exclude_v17, category=None, structure_col=None, stat_test=mannwhitneyu, perform_stat_test=False, immune=False):
+    #print(df)
     cell_fraction_cols = sorted([col for col in df.columns if col.endswith('fraction')])
-    structures = df['structure'].unique()
     
     if category is None:
         # Plot all structures together
         plt.figure(figsize=(14, 6))
-        df_melted = pd.melt(df, id_vars=['pt_id', 'structure'], value_vars=cell_fraction_cols)
+        df_melted = pd.melt(df, id_vars=['pt_id', structure_col], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction', '')
-        ax = sns.boxplot(data=df_melted, x="variable", y="value", hue="structure", palette='tab20')
+        ax = sns.boxplot(data=df_melted, x="variable", y="value", hue=structure_col, palette='tab20')
         
         title_prefix = "Immune Cell Type" if immune else "Cell Type"
         title_suffix = " (excluding v1.7 treatment scheme)" if exclude_v17 else ""
-        plt.title(f"{title_prefix} Fractions by Structure{title_suffix}")
-        file_name = f'{output_dir}{"immune_" if immune else ""}celltype_fraction_by_structure{"_wo_v1.7" if exclude_v17 else "_w_v1.7"}.svg'
+        plt.title(f"{title_prefix} Fractions by {structure_col}{title_suffix}")
+        file_name = f'{output_dir}{"immune_" if immune else ""}celltype_fraction_by_{structure_col}{"_wo_v1.7" if exclude_v17 else "_w_v1.7"}.svg'
         
         plt.xticks(rotation=45, ha='right')
         plt.xlabel("Cell Type")
         plt.ylabel("Fraction")
-        plt.legend(title='Structure')
+        plt.legend(title=structure_col)
         plt.tight_layout()
         plt.savefig(file_name, format='svg', bbox_inches='tight')
         plt.close()
@@ -125,9 +122,9 @@ def celltype_fraction_composition_by_structure(df, output_dir, output_dir_result
     else:
         # Plot split by both structure and category
         plt.figure(figsize=(16, 6))
-        df_melted = pd.melt(df, id_vars=['pt_id', 'structure', category], value_vars=cell_fraction_cols)
+        df_melted = pd.melt(df, id_vars=['pt_id', structure_col, category], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction', '')
-        g = sns.catplot(data=df_melted, x="variable", y="value", hue="structure", col=category, 
+        g = sns.catplot(data=df_melted, x="variable", y="value", hue=structure_col, col=category, 
                         kind='box', palette='tab20', height=6, aspect=1.5)
         
         title_prefix = "Immune Cell Type" if immune else "Cell Type"
@@ -139,7 +136,7 @@ def celltype_fraction_composition_by_structure(df, output_dir, output_dir_result
             ax.set_xlabel("Cell Type")
             ax.set_ylabel("Fraction")
         
-        file_name = f'{output_dir}{category}_{"immune_" if immune else ""}celltype_fraction_by_structure{"_wo_v1.7" if exclude_v17 else "_w_v1.7"}.svg'
+        file_name = f'{output_dir}{category}_{"immune_" if immune else ""}celltype_fraction_by_{structure_col}{"_wo_v1.7" if exclude_v17 else "_w_v1.7"}.svg'
         plt.tight_layout()
         plt.savefig(file_name, format='svg', bbox_inches='tight')
         plt.close()
@@ -203,16 +200,16 @@ def ind_stat_testing(df, cell_fraction_cols, stat_test, category=None):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 3 Create fractions dataframe
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Calculate fractions per T_number
+# Calculate fractions per sample
 fractions_df = pd.DataFrame(dtype=object)
-for i, element in enumerate(adata.obs['T_number'].unique().dropna()):
-    adata_temp = adata[adata.obs['T_number'] == element, :] # Subset adata for element in T_number
-    total_cells_temp = adata_temp.shape[0] # Total number of cells for this T_number
+for i, element in enumerate(adata.obs['sample'].unique().dropna()):
+    adata_temp = adata[adata.obs['sample'] == element, :] # Subset adata for element in sample
+    total_cells_temp = adata_temp.shape[0] # Total number of cells for this sample
     temp_fractions = adata_temp.obs[celltype_key].value_counts()/total_cells_temp # Calculate fractions
     fractions_df = pd.concat([fractions_df, temp_fractions.rename(element)], axis=1) # Save fractions to df
 
     # Add metadata to the fractions_df
-    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme', 'MPR', 'treatment', 'structure']
+    meta_list = ['sample', 'pt_id', 'sample_type', 'disease_stage', 'T_number', 'regression', 'treatment_scheme', 'MPR', 'treatment', 'structure', 'structure_core']
     for meta in meta_list: 
         fractions_df.loc[meta, element] = adata_temp.obs[meta].unique()[0]
 
@@ -227,7 +224,8 @@ paired_pts = list(set(resection_pts) & set(biopsy_pts))
 paired_fractions_df = fractions_df[fractions_df['pt_id'].isin(paired_pts)]
 print(f'Number of paired patients: {len(paired_fractions_df["pt_id"].unique())}')
 
-
+res_df = fractions_df[fractions_df['sample_type']=='Resection']
+print(f'Number of resection samples: {res_df.shape[0]}')
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -235,32 +233,29 @@ if exclude_v17 == True:
     categories = [None, 'MPR'] 
 else:
     categories = [None, 'MPR', 'treatment']
-sample_types = ['Biopsy', 'Resection']
+structure_columns = ['structure', 'structure_core']
 
 # All cell types
 #--------------------------------------------------------------------------------
-
-for category in categories:
-    print(f'Analyzing category: {category}')
-    for sample_type in sample_types:
-        sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
-        if sample_type=='Resection':
-                celltype_fraction_composition_by_structure(sample_type_df, output_dir, output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, perform_stat_test=True, immune=False)            
+for structure_col in structure_columns:    
+    for category in categories:
+        print(f'Analyzing category: {category}')
+        celltype_fraction_composition_by_structure(res_df, output_dir, output_dir_results, category=category, structure_col=structure_col, exclude_v17=exclude_v17, stat_test=mannwhitneyu, perform_stat_test=True, immune=False)            
 
 # Focus on immune cell types only
 #--------------------------------------------------------------------------------
 non_immune = ['Epithelial cell fraction', 'Fibroblast fraction', 'Endothelial cell fraction', 'Pericyte fraction', 'Stromal fraction', 'Tumor cells fraction']
 to_exclude = set(non_immune).intersection(paired_fractions_df.columns)
 print(f'Excluding non-immune cell types: {to_exclude}')
-df_only_immune = paired_fractions_df.drop(labels=to_exclude, axis=1)
+df_only_immune = fractions_df.drop(labels=to_exclude, axis=1)
 
 df_only_immune = df_only_immune[df_only_immune.columns[df_only_immune.columns.str.contains(' fraction')]]  # only keep columns that have ' fraction' in their name
 df_immune = df_only_immune.div(df_only_immune.sum(axis=1), axis=0)  # Re-normalize to sum to 1
-df_immune[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure']] = paired_fractions_df[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure']].values # Add metadata back
-print(df_immune.head())
+df_immune[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure','structure_core']] = fractions_df[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure','structure_core']].values # Add metadata back
 
-for category in categories:    
-    for sample_type in sample_types:
-        sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
-        if sample_type=='Resection':
-            celltype_fraction_composition_by_structure(sample_type_df_immune, output_dir, output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, perform_stat_test=True, immune=True)
+res_df_immune = df_immune[df_immune['sample_type']=='Resection']
+print(f'Number of resection samples (immune only): {res_df_immune.shape[0]}')
+
+for structure_col in structure_columns:
+    for category in categories:    
+        celltype_fraction_composition_by_structure(res_df_immune, output_dir, output_dir_results, category=category, structure_col=structure_col, exclude_v17=exclude_v17, stat_test=mannwhitneyu, perform_stat_test=True, immune=True)

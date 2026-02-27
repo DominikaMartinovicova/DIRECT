@@ -65,7 +65,7 @@ rule all:
         #analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
         #output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl'
         #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
-        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+        data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -73,7 +73,7 @@ rule cell_fraction_analysis:
     input:
         combined_adatas = adata_processed_path
     output:
-        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adata.h5ad" #!!!! changed the name of the output to only call the core_wise rule
     #conda:
     #    xenium_py310
     params:
@@ -93,6 +93,29 @@ rule cell_fraction_analysis:
         --output_dir_plots {params.out_plot_dir}
         """
 
+rule cell_fraction_analysis_core_wise:
+    input:
+        combined_adatas = adata_processed_path
+    output:
+        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+    #conda:
+    #    xenium_py310
+    params:
+        out_plot_dir = f'plots/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}_core_wise/',
+        out_results = f'results/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}_core_wise/',
+        phen_level = phenotyping_level,
+        exclude_flag = "--exclude_v17" if exclude_v17 else ""
+
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/cell_fraction_analysis_core_wise.py \
+	    -i {input.combined_adatas} \
+        --phen_level {params.phen_level} \
+        {params.exclude_flag} \
+        -o {output.analyzed_adatas} \
+        --output_results {params.out_results} \
+        --output_dir_plots {params.out_plot_dir}
+        """
 
 #+++++++++++++++++++++++++++++++++++++++ 2 GENE EXPRESSION ANALYSIS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
 rule gene_expression_analysis:

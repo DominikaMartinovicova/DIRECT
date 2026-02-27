@@ -40,12 +40,14 @@ def preprocess_adata(adata_path, exclude_v17, phenotyping_level=None):
     print('Adding treatment column...')
     adata.obs['treatment'] = np.where(adata.obs['treatment_scheme'] == 'v1.7',"aggressive","milder")
     print(adata)
-    adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad")
 
     print('Adding structure_core column...')
-    adata['structure_core'] = np.where(adata.obs['sample_type']=='Resection', 'core_' + adata.obs[adata.obs['sample_type']=='Resection']['sample'].str.split('_').str[-1])
+    resections_loc = adata.obs['sample_type'] == 'Resection'
+    adata.obs['structure_core'] = np.where(resections_loc, 'core_' + adata.obs['sample'].str.split('_').str[-1], np.nan)
     print(adata)
-
+ 
+    adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad")
+    
     # Save cell type list
     print('Saving cell type list...')
     celltype_list = sorted(adata.obs[phenotyping_level].unique().tolist())
