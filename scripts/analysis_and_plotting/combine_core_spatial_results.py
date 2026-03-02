@@ -63,7 +63,7 @@ os.makedirs(output_dir_results, exist_ok=True)
 #--------------------------------------------------------------------------------
 adata = sc.read_h5ad(args.adata)
 print(adata)
-core_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number','pt_id', 'treatment', 'structure']].drop_duplicates().set_index('sample')
+core_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number','pt_id', 'treatment', 'structure', 'structure_core']].drop_duplicates().set_index('sample')
 print(core_info)
 cores_list = core_info.index.tolist()  #list of cores to combine
 
@@ -130,13 +130,15 @@ for core in centrality_results.keys():
 
 # Add sample info
 degree_centrality_scores = degree_centrality_scores.transpose()
-degree_centrality_scores = degree_centrality_scores.join(core_info[['sample_type', 'MPR', 'pt_id', 'treatment_scheme', 'treatment', 'structure']], how='left')
+#degree_centrality_scores = degree_centrality_scores.join(core_info[['sample_type', 'MPR', 'pt_id', 'treatment_scheme', 'treatment', 'structure']], how='left')
+degree_centrality_scores = degree_centrality_scores.join(core_info, how='left')
 
 average_clustering_scores = average_clustering_scores.transpose()
-average_clustering_scores = average_clustering_scores.join(core_info[['sample_type', 'MPR', 'pt_id', 'treatment_scheme', 'treatment', 'structure']], how='left')
+#average_clustering_scores = average_clustering_scores.join(core_info[['sample_type', 'MPR', 'pt_id', 'treatment_scheme', 'treatment', 'structure']], how='left')
+average_clustering_scores = average_clustering_scores.join(core_info, how='left')
 
 closeness_centrality_scores = closeness_centrality_scores.transpose()
-closeness_centrality_scores = closeness_centrality_scores.join(core_info[['sample_type', 'MPR', 'pt_id', 'treatment_scheme', 'treatment', 'structure' ]], how='left')
+closeness_centrality_scores = closeness_centrality_scores.join(core_info, how='left')
 
 combined_centrality_scores = {'degree_centrality': degree_centrality_scores,'average_clustering': average_clustering_scores,'closeness_centrality': closeness_centrality_scores}
 with open(os.path.join(output_dir_results, 'combined_centrality_scores.pkl'), 'wb') as f:
@@ -149,12 +151,9 @@ combined_nhood_enrichment = {}
 
 for core in nhood_results.keys():
     combined_nhood_enrichment[core] = nhood_results[core]
-    combined_nhood_enrichment[core]['sample_type'] = core_info.loc[core, 'sample_type']
-    combined_nhood_enrichment[core]['MPR'] = core_info.loc[core, 'MPR']
-    combined_nhood_enrichment[core]['pt_id'] = core_info.loc[core, 'pt_id']
-    combined_nhood_enrichment[core]['treatment_scheme'] = core_info.loc[core, 'treatment_scheme']
-    combined_nhood_enrichment[core]['treatment'] = core_info.loc[core, 'treatment']
-    combined_nhood_enrichment[core]['structure'] = core_info.loc[core, 'structure']
+    for info in core_info.columns:
+        combined_nhood_enrichment[core][info] = core_info.loc[core, info]
+
 #print(combined_nhood_enrichment)
 with open(os.path.join(output_dir_results, 'combined_neighbors_enrichment.pkl'), 'wb') as f:
     pickle.dump(combined_nhood_enrichment, f)
@@ -163,14 +162,20 @@ with open(os.path.join(output_dir_results, 'combined_neighbors_enrichment.pkl'),
 #--------------------------------------------------------------------------------
 print('Combining interaction matrices...')
 combined_interaction_matrices = {}
+# for core in interaction_results.keys():
+#     combined_interaction_matrices[core] = {'matrix': interaction_results[core],
+#                                              'sample_type': core_info.loc[core, 'sample_type'],
+#                                              'MPR': core_info.loc[core, 'MPR'],
+#                                              'pt_id': core_info.loc[core, 'pt_id'],
+#                                              'treatment_scheme': core_info.loc[core, 'treatment_scheme'],
+#                                              'treatment': core_info.loc[core, 'treatment'],
+#                                              'structure': core_info.loc[core, 'structure']}
+
 for core in interaction_results.keys():
-    combined_interaction_matrices[core] = {'matrix': interaction_results[core],
-                                             'sample_type': core_info.loc[core, 'sample_type'],
-                                             'MPR': core_info.loc[core, 'MPR'],
-                                             'pt_id': core_info.loc[core, 'pt_id'],
-                                             'treatment_scheme': core_info.loc[core, 'treatment_scheme'],
-                                             'treatment': core_info.loc[core, 'treatment'],
-                                             'structure': core_info.loc[core, 'structure']}
+    combined_interaction_matrices[core] = {'matrix': interaction_results[core]}
+    for info in core_info.columns:
+        combined_interaction_matrices[core][info] = core_info.loc[core, info]
+
 #print(combined_interaction_matrices)
 with open(os.path.join(output_dir_results, 'combined_interaction_matrix.pkl'), 'wb') as f:
     pickle.dump(combined_interaction_matrices, f)
@@ -181,12 +186,9 @@ print('Combining co-occurrence probabilities...')
 combined_cooccurrence_probs={}
 for core in cooccurrence_results.keys():
     combined_cooccurrence_probs[core] = cooccurrence_results[core]
-    combined_cooccurrence_probs[core]['sample_type'] = core_info.loc[core, 'sample_type']
-    combined_cooccurrence_probs[core]['MPR'] = core_info.loc[core, 'MPR']
-    combined_cooccurrence_probs[core]['pt_id'] = core_info.loc[core, 'pt_id']
-    combined_cooccurrence_probs[core]['treatment_scheme'] = core_info.loc[core, 'treatment_scheme']
-    combined_cooccurrence_probs[core]['treatment'] = core_info.loc[core, 'treatment']
-    combined_cooccurrence_probs[core]['structure'] = core_info.loc[core, 'structure']
+    for info in core_info.columns:
+        combined_cooccurrence_probs[core][info] = core_info.loc[core, info]
+
 #print(combined_cooccurrence_probs)
 with open(os.path.join(output_dir_results, 'combined_cooccurrence_probabilities.pkl'), 'wb') as f:
     pickle.dump(combined_cooccurrence_probs, f)

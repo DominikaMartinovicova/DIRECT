@@ -95,3 +95,28 @@ ax.legend(
 plt.tight_layout()
 plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}/spatial/patching/{patch_size}um_{overlap}um/{patch}_cooccurrence_mean.png')
 plt.close()
+
+
+
+# Plot ripley's L statistics
+ripleys_L_path = os.path.join(input_dir, 'dict_ripleys_L.pkl')
+with open(ripleys_L_path, 'rb') as f:
+    dict_ripley = pickle.load(f)
+
+df = dict_ripley['L_stat']
+
+plt.figure(figsize=(12, 7))
+sns.lineplot(data=df,x='bins',y='stats',hue='Neutro_Epi_extImm_pooled_A_EM_N',estimator=None)  # ensures raw lines are drawn
+
+plt.legend(title='Cell type', bbox_to_anchor=(1.02, 1), loc='upper left')
+plt.tight_layout()
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}/spatial/patching/{patch_size}um_{overlap}um/{patch}_ripleys_L.png', bbox_inches='tight')
+
+
+
+
+
+
+
+
+

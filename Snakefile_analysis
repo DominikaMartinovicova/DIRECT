@@ -21,7 +21,6 @@ def spatial_targets_core(wildcards):
     return expand(output_dir_results + 'spatial/per_sample/{core}/centrality_scores.csv',
                   core=get_cores(wildcards))
 
-
 def combine_inputs(wildcards):
     files = []
     patches = get_patches(wildcards)
@@ -53,7 +52,7 @@ adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas
 #sample_dict = get_sample_dict(adata)
 output_dir_results = f'results/analysis/{phenotyping_level}/'
 output_dir_plots = f'plots/analysis/{phenotyping_level}/'
-patch_size = 200  # in microns
+patch_size = 5000  # in microns
 overlap = 50       # in microns
 print('Exclude v1.7 samples:', exclude_v17)
 
@@ -65,8 +64,11 @@ rule all:
         #analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
         #output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl'
         #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
-        data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad",
-        data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad"
+        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad",
+        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
+        #expand(output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl', core=ripleys_L_core)
+        #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
+        output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl'
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -184,7 +186,8 @@ rule spatial_analysis_per_patch:
         centrality_scores = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/centrality_scores.csv',
         nhood_enrichment = output_dir_results + f"spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/neighbors_enrichment.pkl",
         interaction_matrix = output_dir_results + f"spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/interaction_matrix.pkl",
-        co_occurrence = output_dir_results + f"spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/co_occurrence_probabilities.pkl"
+        co_occurrence = output_dir_results + f"spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/co_occurrence_probabilities.pkl",
+        ripleys_L = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/dict_ripleys_L.pkl'
     params:
         celltype_key = phenotyping_level,
         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt"
@@ -209,7 +212,8 @@ rule combine_spatial_analysis_results:
         combined_centrality_scores = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl',
         combined_nhood_enrichment = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_neighbors_enrichment.pkl",
         combined_interaction_matrix = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_interaction_matrix.pkl",
-        combined_co_occurrence = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_cooccurrence_probabilities.pkl"
+        combined_co_occurrence = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_cooccurrence_probabilities.pkl",
+        combined_ripleys_L = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_ripleys_L.pkl'
     params:
         adata_path = data_dir + f"/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/adata_patches_gex.h5ad",
         in_dir = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/',
@@ -255,7 +259,8 @@ rule spatial_analysis_per_core:
         centrality_scores = output_dir_results + f'spatial/per_sample/{{core}}/centrality_scores.csv',
         nhood_enrichment = output_dir_results + f"spatial/per_sample/{{core}}/neighbors_enrichment.pkl",
         interaction_matrix = output_dir_results + f"spatial/per_sample/{{core}}/interaction_matrix.pkl",
-        co_occurrence = output_dir_results + f"spatial/per_sample/{{core}}/co_occurrence_probabilities.pkl"
+        co_occurrence = output_dir_results + f"spatial/per_sample/{{core}}/co_occurrence_probabilities.pkl",
+        ripleys_L = output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl'
     params:
         celltype_key = phenotyping_level,
         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt"
@@ -281,7 +286,8 @@ rule combine_core_spatial_analysis_results:
         combined_centrality_scores = output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
         combined_nhood_enrichment = output_dir_results + "spatial/combined/core_level/combined_neighbors_enrichment.pkl",
         combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
-        combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
+        combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl",
+        combined_ripleys_L = output_dir_results + f'spatial/combined/core_level/combined_ripleys_L.pkl'
     params:
         adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis_w_v1.7.h5ad",
         in_dir = output_dir_results + 'spatial/per_sample/',
@@ -350,7 +356,5 @@ rule stat_analysis_centrality_core_level:
 
         # combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
         # combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
-
-
 
 

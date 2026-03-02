@@ -47,8 +47,8 @@ def parse_args():
     parser.add_argument('-i', help='path to input directory with spatial analysis results per sample',
                         dest='input',
                         type=str)
-    parser.add_argument('--celltype_list', help='list of all cell types in the data',
-                        dest='celltype_list',
+    parser.add_argument('--phen_level', help='key with celltype annotations in adata.obs',
+                        dest='phenotyping_level',
                         type=str)
     parser.add_argument('--exclude_v17', action='store_true',
                         help='Exclude v1.7 samples')
@@ -64,14 +64,19 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
+args = parse_args()
+adata = sc.read_h5ad(args.input)
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Calculate Ripley's statistics across samples
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+dict_ripley = sq.gr.ripley(adata, cluster_key = args.phenotyping_level, mode = 'L', copy=True)
 
+with open(args.output_dir_results, "wb") as f:
+    pickle.dump(dict_ripley, f)
 
-
-
-
+print("Ripley's L statistics calculated and saved to results directory.")
 
 
 
