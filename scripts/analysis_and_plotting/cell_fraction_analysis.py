@@ -168,7 +168,7 @@ def celltype_fraction_shifts_lineplot(df, output_dir, output_dir_results, catego
         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
         # Plot stripplot with lines connecting paired samples
-        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type",hue_order=['Biopsy', 'Resection'], col=category, dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, kind='strip')
+        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type",hue_order=['Biopsy', 'Resection'], col=category, dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, kind='strip', height=6, aspect=1.5)
         
         # Loop over each axis to add lines
         for ax, (facet_key, subdata) in zip(g.axes.flat, g.facet_data()):
@@ -203,15 +203,19 @@ def celltype_fraction_shifts_lineplot(df, output_dir, output_dir_results, catego
                 if immune==False and exclude_v17==False:
                     stat_df.to_csv(f'{output_dir_results}/{category}_{stat_test.__name__}_paired_celltype_fraction_statistical_results_w_v1.7.csv', index=False)
                     file_name = f'{output_dir}{category}_celltype_fraction_shifts_lineplot_{stat_test.__name__}_w_v1.7.svg'
+                    title = f"Cell Type Fractions in Biopsy vs Resection ({category}) ({stat_test.__name__})"
                 elif immune==True and exclude_v17==False:
                     stat_df.to_csv(f'{output_dir_results}/{category}_{stat_test.__name__}_paired_immune_celltype_fraction_statistical_results_w_v1.7.csv', index=False)
                     file_name = f'{output_dir}{category}_immune_celltype_fraction_shifts_lineplot_{stat_test.__name__}_w_v1.7.svg'
+                    title = f"Immune Cell Type Fractions in Biopsy vs Resection ({category}) ({stat_test.__name__})"
                 elif immune==False and exclude_v17==True:
                     stat_df.to_csv(f'{output_dir_results}/{category}_{stat_test.__name__}_paired_celltype_fraction_statistical_results_wo_v1.7.csv', index=False)
                     file_name = f'{output_dir}{category}_celltype_fraction_shifts_lineplot_{stat_test.__name__}_wo_v1.7.svg'
+                    title = f"Cell Type Fractions in Biopsy vs Resection (excluding v1.7 treatment scheme) ({category}) ({stat_test.__name__})"
                 elif immune==True and exclude_v17==True:
                     stat_df.to_csv(f'{output_dir_results}/{category}_{stat_test.__name__}_paired_immune_celltype_fraction_statistical_results_wo_v1.7.csv', index=False)
                     file_name = f'{output_dir}{category}_immune_celltype_fraction_shifts_lineplot_{stat_test.__name__}_wo_v1.7.svg'
+                    title = f"Immune Cell Type Fractions in Biopsy vs Resection (excluding v1.7 treatment scheme) ({category}) ({stat_test.__name__})"
                 # Generate pairs for significant comparisons only
                 alpha = 0.05
                 sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
@@ -230,8 +234,9 @@ def celltype_fraction_shifts_lineplot(df, output_dir, output_dir_results, catego
         g.set_ylabels("Fraction")
         g.legend.set_title('Sample Type')
         g.legend.set_loc('upper right')
+        plt.suptitle(title, y=1.02)
         plt.tight_layout()
-        plt.savefig(file_name, format='svg')
+        plt.savefig(file_name, format='svg', bbox_inches='tight')
         plt.close()
 
 
@@ -293,7 +298,7 @@ def celltype_fraction_composition_box(df, output_dir, output_dir_results, exclud
         plt.figure(figsize=(20, 10))
         df_melted = pd.melt(df, id_vars=['pt_id', 'sample_type', category], value_vars=cell_fraction_cols)
         df_melted['variable'] = df_melted['variable'].str.replace(' fraction','')
-        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", hue_order=['Biopsy', 'Resection'], col=category, kind='box', palette='tab20')
+        g = sns.catplot(data=df_melted, x="variable", y="value", hue="sample_type", hue_order=['Biopsy', 'Resection'], col=category, kind='box', palette='tab20', height=6, aspect=1.5)
 
         # Loop over each axis to add lines
         for ax, (facet_key, subdata) in zip(g.axes.flat, g.facet_data()): 
@@ -711,13 +716,13 @@ sample_types = ['Biopsy', 'Resection']
 for category in categories:
     print(f'Analyzing category: {category}')
     celltype_fraction_shifts_lineplot(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-    celltype_fraction_composition_box(fractions_df, output_dir, output_dir_results, category = category, exclude_v17=exclude_v17, immune=False, stat_test = mannwhitneyu, perform_stat_test=True)
-    celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-    celltype_fraction_shifts_foldchange(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-    for sample_type in sample_types:
-        sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
-        if category != None:
-                composition_within_sampletype_box(sample_type_df, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    # celltype_fraction_composition_box(fractions_df, output_dir, output_dir_results, category = category, exclude_v17=exclude_v17, immune=False, stat_test = mannwhitneyu, perform_stat_test=True)
+    # celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    # celltype_fraction_shifts_foldchange(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    # for sample_type in sample_types:
+    #     sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
+    #     if category != None:
+    #             composition_within_sampletype_box(sample_type_df, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
             
 # Focus on immune cell types only
 #--------------------------------------------------------------------------------
@@ -733,10 +738,10 @@ print(df_immune.head())
 
 for category in categories:    
     celltype_fraction_shifts_lineplot(df_immune, output_dir,output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=True,exclude_v17=exclude_v17)
-    celltype_fraction_composition_box(df_immune, output_dir, output_dir_results, category = category, immune=True, exclude_v17=exclude_v17, stat_test = mannwhitneyu, perform_stat_test=True)
-    celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
-    celltype_fraction_shifts_foldchange(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
-    for sample_type in sample_types:
-        sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
-        if category != None:
-            composition_within_sampletype_box(sample_type_df_immune, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    # celltype_fraction_composition_box(df_immune, output_dir, output_dir_results, category = category, immune=True, exclude_v17=exclude_v17, stat_test = mannwhitneyu, perform_stat_test=True)
+    # celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    # celltype_fraction_shifts_foldchange(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    # for sample_type in sample_types:
+    #     sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
+    #     if category != None:
+    #         composition_within_sampletype_box(sample_type_df_immune, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
