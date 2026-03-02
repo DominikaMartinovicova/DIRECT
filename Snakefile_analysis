@@ -40,7 +40,7 @@ def combine_inputs(wildcards):
 #-------------------------------------------------------------------------------------------------------------------
 data_dir = 'data/'
 log_dir = 'logs/analysis/'
-exclude_v17 = False
+exclude_v17 = True
 if exclude_v17:
     ex_v17 = "wo_v1.7"
 elif not exclude_v17:

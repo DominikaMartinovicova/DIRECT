@@ -716,13 +716,13 @@ sample_types = ['Biopsy', 'Resection']
 for category in categories:
     print(f'Analyzing category: {category}')
     celltype_fraction_shifts_lineplot(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-    # celltype_fraction_composition_box(fractions_df, output_dir, output_dir_results, category = category, exclude_v17=exclude_v17, immune=False, stat_test = mannwhitneyu, perform_stat_test=True)
-    # celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-    # celltype_fraction_shifts_foldchange(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
-    # for sample_type in sample_types:
-    #     sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
-    #     if category != None:
-    #             composition_within_sampletype_box(sample_type_df, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    celltype_fraction_composition_box(fractions_df, output_dir, output_dir_results, category = category, exclude_v17=exclude_v17, immune=False, stat_test = mannwhitneyu, perform_stat_test=True)
+    celltype_fraction_shifts_box(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    celltype_fraction_shifts_foldchange(paired_fractions_df, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
+    for sample_type in sample_types:
+        sample_type_df = fractions_df[fractions_df['sample_type']==sample_type]
+        if category != None:
+                composition_within_sampletype_box(sample_type_df, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=False, exclude_v17=exclude_v17)
             
 # Focus on immune cell types only
 #--------------------------------------------------------------------------------
@@ -738,10 +738,10 @@ print(df_immune.head())
 
 for category in categories:    
     celltype_fraction_shifts_lineplot(df_immune, output_dir,output_dir_results, category=category, stat_test=wilcoxon, perform_stat_test=True, immune=True,exclude_v17=exclude_v17)
-    # celltype_fraction_composition_box(df_immune, output_dir, output_dir_results, category = category, immune=True, exclude_v17=exclude_v17, stat_test = mannwhitneyu, perform_stat_test=True)
-    # celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
-    # celltype_fraction_shifts_foldchange(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
-    # for sample_type in sample_types:
-    #     sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
-    #     if category != None:
-    #         composition_within_sampletype_box(sample_type_df_immune, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    celltype_fraction_composition_box(df_immune, output_dir, output_dir_results, category = category, immune=True, exclude_v17=exclude_v17, stat_test = mannwhitneyu, perform_stat_test=True)
+    celltype_fraction_shifts_box(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    celltype_fraction_shifts_foldchange(df_immune, output_dir, output_dir_results, category=category, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
+    for sample_type in sample_types:
+        sample_type_df_immune = df_immune[df_immune['sample_type']==sample_type]
+        if category != None:
+            composition_within_sampletype_box(sample_type_df_immune, output_dir, output_dir_results, category=category, sample_type=sample_type, stat_test=mannwhitneyu, perform_stat_test=True, immune=True, exclude_v17=exclude_v17)
