@@ -46,6 +46,11 @@ def preprocess_adata(adata_path, exclude_v17, phenotyping_level=None):
     adata.obs['structure_core'] = np.where(resections_loc, 'core_' + adata.obs['sample'].str.split('_').str[-1], np.nan)
     print(adata)
  
+    # Replace spaces with underscores in cell type names
+    print('Replacing spaces with underscores in cell type names...')
+    adata.obs[phenotyping_level] = adata.obs[phenotyping_level].str.replace(' ', '_', regex=False)
+    print(adata.obs[phenotyping_level].unique())
+
     adata.write_h5ad(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad")
     
     # Save cell type list

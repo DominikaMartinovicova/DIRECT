@@ -53,8 +53,7 @@ def parse_args():
                         dest='phen_level',
                         type=str)
     parser.add_argument('--coi', help='list for cell types of interest',
-                        dest='coi',
-                        type=str)
+                        dest='coi', type=str, required=True, nargs='+')
     parser.add_argument('-o', '--output_results', help='path to output dir with patches per sample',
                         dest='output_dir_results',
                         type=str)
@@ -66,10 +65,10 @@ args = parse_args()
 adata = sc.read_h5ad(args.input)
 cluster_key = args.phen_level
 output_dir_results = args.output_dir_results
-output_dir = args.output_dir_plots
+coi_list = args.coi
+print(f"Cell types of interest: {coi_list}")
 
 # Make sure output directories exist
-os.makedirs(output_dir, exist_ok=True)
 os.makedirs(output_dir_results, exist_ok=True)
 
 
@@ -161,12 +160,19 @@ def _cross_L(coords_i, coords_j, radii, area):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-for type_i in args.coi:
-    for type_j in args.coi:
+for type_i in coi_list:
+    for type_j in coi_list:
         if type_i != type_j:
             print(f"Calculating cross-type Ripley's L for {type_i} vs {type_j}...")
             res = cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_steps=50, max_dist=None, n_simulations=10, seed=42, copy=True)
             # Save results for this pair of types
-            with open(os.path.join(output_dir_results, f"cross_ripley_{type_i}_vs_{type_j}.csv"), "w") as f:
+            with open(os.path.join(output_dir_results, f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "wb") as f:
                 pickle.dump(res, f)
+            # save the results as csv file
+            res_df = pd.DataFrame({
+                "r": res["r"],
+                "L_observed": res["L_observed"],
+                "pvalues": res["pvalues"]
+            })
+            res_df.to_csv(os.path.join(output_dir_results, f"cross_ripley_{type_i}_vs_{type_j}.csv"), index=False)
 

@@ -43,7 +43,7 @@ def combine_inputs(wildcards):
 #-------------------------------------------------------------------------------------------------------------------
 data_dir = 'data/'
 log_dir = 'logs/analysis/'
-exclude_v17 = True
+exclude_v17 = False
 if exclude_v17:
     ex_v17 = "wo_v1.7"
 elif not exclude_v17:
@@ -71,9 +71,9 @@ rule all:
         #data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad",
         #data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
         #expand(output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl', core=ripleys_L_core)
-        #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
-        #output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl'
-        ripleys_L_core
+        #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
+        output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl',
+        #ripleys_L_core
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -287,10 +287,10 @@ rule cross_ripleys_per_core:
     input:
         adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
     output:
-        ripleys_L = output_dir_results + 'spatial/per_sample/{core}/cross_ripleys_L.pkl'
+        ripleys_L = output_dir_results + 'spatial/per_sample/{core}/cross_ripley_B cell_vs_T cell regulatory.csv'
     params:
         celltype_key = phenotyping_level,
-        coi = ['B cell', 'T cell regulatory', 'Stromal']
+        coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
     #conda:
     #    "xenium_py310"
     shell:
