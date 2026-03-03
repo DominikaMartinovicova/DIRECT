@@ -21,6 +21,10 @@ def spatial_targets_core(wildcards):
     return expand(output_dir_results + 'spatial/per_sample/{core}/centrality_scores.csv',
                   core=get_cores(wildcards))
 
+def ripleys_L_core(wildcards):
+    return expand(output_dir_results + 'spatial/per_sample/{core}/cross_ripleys_L.pkl',
+                  core=get_cores(wildcards))
+
 def combine_inputs(wildcards):
     files = []
     patches = get_patches(wildcards)
@@ -68,7 +72,8 @@ rule all:
         #data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
         #expand(output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl', core=ripleys_L_core)
         #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
-        output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl'
+        #output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl'
+        ripleys_L_core
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -276,6 +281,26 @@ rule spatial_analysis_per_core:
         -o_plots {output_dir_plots}/spatial/per_sample/{wildcards.core}/ \
         """
 
+# Perform Ripley's L function analysis per core or tissue piece
+#-------------------------------------------------------------------------------------------------------------------
+rule cross_ripleys_per_core:
+    input:
+        adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
+    output:
+        ripleys_L = output_dir_results + 'spatial/per_sample/{core}/cross_ripleys_L.pkl'
+    params:
+        celltype_key = phenotyping_level,
+        coi = ['B cell', 'T cell regulatory', 'Stromal']
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/cross_type_ripleys.py \
+        -i {input.adata_core_subset} \
+        --phen_level {params.celltype_key} \
+        --coi {params.coi} \
+        -o {output_dir_results}/spatial/per_sample/{wildcards.core}/ \
+        """
 
 # Combine spatial analysis results 
 #-------------------------------------------------------------------------------------------------------------------

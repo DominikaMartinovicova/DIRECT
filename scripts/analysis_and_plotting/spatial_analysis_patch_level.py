@@ -203,3 +203,10 @@ with open(output_dir_results + "/co_occurrence_probabilities.pkl", "wb") as f:
 #plt.savefig(output_dir + 'co_occurrence_probabilities.svg',format='svg', dpi=300, bbox_inches='tight')
 #plt.close()
 
+# Compute Ripley's L statistics
+#--------------------------------------------------------------------------------
+print('Computing Ripley\'s L statistics...')
+dict_ripley = sq.gr.ripley(adata, cluster_key = celltype_key, mode = 'L', copy=True)
+
+with open(output_dir_results + "/dict_ripleys_L.pkl", "wb") as f:
+    pickle.dump(dict_ripley, f)
