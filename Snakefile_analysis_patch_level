@@ -13,10 +13,6 @@ def get_patches(wildcards):
     patch_files = glob.glob(f'{ckpts.output.output_dir_patches}/patch_*.h5ad')
     return [file.split('/')[-1].replace('patch_', '').replace('.h5ad','') for file in patch_files]
 
-def spatial_targets(wildcards):
-    return expand(output_dir_results + 'spatial/per_patch/{patch_size}um_{overlap}um/{patch}/centrality_scores.csv',
-                  patch=get_patches(wildcards), patch_size=patch_size, overlap=overlap)
-
 def combine_inputs(wildcards):
     files = []
     patches = get_patches(wildcards)
@@ -44,7 +40,6 @@ if exclude_v17:
 elif not exclude_v17:
     ex_v17 = "w_v1.7"
 print('Exclude v1.7 samples:', exclude_v17)
-
 
 patch_size = config["patch_size"]
 overlap = config["overlap"]

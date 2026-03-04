@@ -8,240 +8,59 @@ configfile: "config.yaml"
 #+++++++++++++++++++++++++++++++++++++++ 0 PREPARE WILDCARDS AND TARGET ++++++++++++++++++++++++++++++++++++++++++++
 # Prepare functions to get dynamic wildcards for patch-level spatial analysis
 #-------------------------------------------------------------------------------------------------------------------
-def spatial_targets(wildcards):
-    return expand(output_dir_results + 'spatial/per_patch/{patch_size}um_{overlap}um/{patch}/centrality_scores.csv',
-                  patch=get_patches(wildcards), patch_size=patch_size, overlap=overlap)
-
 def get_cores(wildcards):
     ckpts = checkpoints.core_level_adata.get()
     core_files = glob.glob(f'{ckpts.output.output_dir_cores}/T*.h5ad')
     return [file.split('/')[-1].replace('.h5ad','') for file in core_files]
 
-def spatial_targets_core(wildcards):
-    return expand(output_dir_results + 'spatial/per_sample/{core}/centrality_scores.csv',
-                  core=get_cores(wildcards))
-
-def ripleys_L_core(wildcards):
-    return expand(output_dir_results + 'spatial/per_sample/{core}/cross_ripleys_L.pkl',
-                  core=get_cores(wildcards))
-
 def combine_inputs(wildcards):
     files = []
-    patches = get_patches(wildcards)
-    files += expand(output_dir_results + 'spatial/per_patch/{patch_size}um_{overlap}um/{patch}/centrality_scores.csv',
-                              patch=patches, patch_size=patch_size, overlap=overlap)
-    files += expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/neighbors_enrichment.pkl",
-                              patch=patches, patch_size=patch_size, overlap=overlap)
-    files += expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/interaction_matrix.pkl",
-                               patch=patches, patch_size=patch_size, overlap=overlap)
-    files += expand(output_dir_results + "spatial/per_patch/{patch_size}um_{overlap}um/{patch}/co_occurrence_probabilities.pkl",
-                          patch=patches, patch_size=patch_size, overlap=overlap)
+    cores = get_cores(wildcards)
+    files += expand(output_dir_results + 'spatial/per_sample/{core}/centrality_scores.csv', core=cores)
+    files += expand(output_dir_results + "spatial/per_sample/{core}/neighbors_enrichment.pkl",core=cores)
+    files += expand(output_dir_results + "spatial/per_sample/{core}/interaction_matrix.pkl",core=cores)
+    files += expand(output_dir_results + "spatial/per_sample/{core}/co_occurrence_probabilities.pkl",core=cores)
     return files
 
+# def ripleys_L_core(wildcards):
+#     return expand(output_dir_results + 'spatial/per_sample/{core}/cross_ripleys_L.pkl',
+#                   core=get_cores(wildcards))
 
 # Prepare wildcards and variables
 #-------------------------------------------------------------------------------------------------------------------
-data_dir = 'data/'
-log_dir = 'logs/analysis/'
-exclude_v17 = False
+data_dir = config["all"]["data_dir"]
+log_dir = config["all"]["log_dir"]
+phenotyping_level = config["phenotyping_level"]
+output_dir_results = config["all"]["output_dir_results"].format(phenotyping_level=phenotyping_level)
+output_dir_plots = config["all"]["output_dir_plots"].format(phenotyping_level=phenotyping_level)
+exclude_v17 = config["exclude_v17"]
 if exclude_v17:
     ex_v17 = "wo_v1.7"
 elif not exclude_v17:
     ex_v17 = "w_v1.7"
-phenotyping_level = 'Neutro_Epi_extImm_pooled_A_EM_N'
-adata_path = data_dir + f"combined/{phenotyping_level}_combined_adatas.h5ad"
+print('Exclude v1.7 samples:', exclude_v17)
+
+adata_path = f"{data_dir}combined/{phenotyping_level}_combined_adatas.h5ad"
 #samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
 adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad"
-#save_per_sample_adata(adata, output_dir=data_dir + f'per_sample/{phenotyping_level}/')
-#sample_dict = get_sample_dict(adata)
-output_dir_results = f'results/analysis/{phenotyping_level}/'
-output_dir_plots = f'plots/analysis/{phenotyping_level}/'
-patch_size = 5000  # in microns
-overlap = 50       # in microns
-print('Exclude v1.7 samples:', exclude_v17)
 
 
 # Specify target rules
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        #analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
-        #output_dir_results + f'spatial/combined/core_level/combined_centrality_scores.pkl'
-        #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
-        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad",
-        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
         #expand(output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl', core=ripleys_L_core)
-        #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
-        output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl',
+        output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
         #ripleys_L_core
 
 
-#+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
-rule cell_fraction_analysis:
-    input:
-        combined_adatas = adata_processed_path
-    output:
-        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adata.h5ad" #!!!! changed the name of the output to only call the core_wise rule
-    #conda:
-    #    xenium_py310
-    params:
-        out_plot_dir = f'plots/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}/',
-        out_results = f'results/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}/',
-        phen_level = phenotyping_level,
-        exclude_flag = "--exclude_v17" if exclude_v17 else ""
 
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/cell_fraction_analysis.py \
-	    -i {input.combined_adatas} \
-        --phen_level {params.phen_level} \
-        {params.exclude_flag} \
-        -o {output.analyzed_adatas} \
-        --output_results {params.out_results} \
-        --output_dir_plots {params.out_plot_dir}
-        """
-
-rule cell_fraction_analysis_core_wise:
-    input:
-        combined_adatas = adata_processed_path
-    output:
-        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
-    #conda:
-    #    xenium_py310
-    params:
-        out_plot_dir = f'plots/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}_core_wise/',
-        out_results = f'results/analysis/{phenotyping_level}/celltype_fraction_{ex_v17}_core_wise/',
-        phen_level = phenotyping_level,
-        exclude_flag = "--exclude_v17" if exclude_v17 else ""
-
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/cell_fraction_analysis_core_wise.py \
-	    -i {input.combined_adatas} \
-        --phen_level {params.phen_level} \
-        {params.exclude_flag} \
-        -o {output.analyzed_adatas} \
-        --output_results {params.out_results} \
-        --output_dir_plots {params.out_plot_dir}
-        """
-
-#+++++++++++++++++++++++++++++++++++++++ 2 GENE EXPRESSION ANALYSIS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
-rule gene_expression_analysis:
-    input:
-        combined_adatas = adata_processed_path
-    output:
-        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
-    conda:
-        "/appdata/users/P083831/conda_envs/scverse_py311"
-    params:
-        out_plot_dir = f'plots/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
-        out_results = f'results/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
-        phen_level = phenotyping_level,
-        exclude_flag = "--exclude_v17" if exclude_v17 else ""
-
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/gex_analysis.py \
-	    -i {input.combined_adatas} \
-        --phen_level {params.phen_level} \
-        {params.exclude_flag} \
-        -o {output.analyzed_adatas} \
-        --output_results {params.out_results} \
-        --output_dir_plots {params.out_plot_dir}
-        """
-
-
-
-#+++++++++++++++++++++++++++++++++++++++ 3 SPATIALLY ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
-
-#------------------------------------------ patch-level spatial analysis --------------------------------------------
-
-# Divide each piece of tissue into smaller regions (patches) and analyze them separately
-#-------------------------------------------------------------------------------------------------------------------
-checkpoint patching:
-    input:
-        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad" # from utils.preprocess_adata function removed v1.7 samples
-    output:
-        output_dir_patches = directory(data_dir + f'adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/')
-    params:
-        patch_size = patch_size,
-        overlap = overlap,
-        plots_dir = output_dir_plots + f'spatial/patching/{patch_size}um_{overlap}um/',
-        celltype_key = phenotyping_level
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/patching.py \
-        -i {input.adata} \
-        --patch_size {params.patch_size} \
-        --overlap {params.overlap} \
-        --celltype_key {params.celltype_key} \
-        -o {output.output_dir_patches} \
-        --plots_dir {params.plots_dir} \
-        """
-
-# Spatial analysis per patch
-#-------------------------------------------------------------------------------------------------------------------
-rule spatial_analysis_per_patch:
-    input:
-        adata_patch_subset = data_dir + f'adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/patch_{{patch}}.h5ad'
-    output:
-        output_plot_dir = directory(output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/'),
-        centrality_scores = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/centrality_scores.csv',
-        nhood_enrichment = output_dir_results + f"spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/neighbors_enrichment.pkl",
-        interaction_matrix = output_dir_results + f"spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/interaction_matrix.pkl",
-        co_occurrence = output_dir_results + f"spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/co_occurrence_probabilities.pkl",
-        ripleys_L = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/{{patch}}/dict_ripleys_L.pkl'
-    params:
-        celltype_key = phenotyping_level,
-        celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt"
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/spatial_analysis_patch_level.py \
-        -i {input.adata_patch_subset} \
-        --celltype_key {params.celltype_key} \
-        --celltype_list {params.celltype_list} \
-        -o_results {output_dir_results}/spatial/per_patch/{patch_size}um_{overlap}um/{wildcards.patch}/ \
-        -o_plots {output_dir_plots}/spatial/per_patch/{patch_size}um_{overlap}um/{wildcards.patch}/ \
-        """
-
-# Combine spatial analysis results 
-#-------------------------------------------------------------------------------------------------------------------
-rule combine_spatial_analysis_results:
-    input:
-        combine_inputs
-    output:
-        combined_centrality_scores = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_centrality_scores.pkl',
-        combined_nhood_enrichment = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_neighbors_enrichment.pkl",
-        combined_interaction_matrix = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_interaction_matrix.pkl",
-        combined_co_occurrence = output_dir_results + f"spatial/combined/{patch_size}um_{overlap}um/combined_cooccurrence_probabilities.pkl",
-        combined_ripleys_L = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/combined_ripleys_L.pkl'
-    params:
-        adata_path = data_dir + f"/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/adata_patches_gex.h5ad",
-        in_dir = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/',
-        out_dir_results = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/',
-        out_dir_plots = output_dir_plots + f'spatial/combined/{patch_size}um_{overlap}um/'
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/combine_patch_spatial_results.py \
-        -i {params.in_dir} \
-        --adata {params.adata_path} \
-        -o_results {params.out_dir_results} \
-        -o_plots {params.out_dir_plots} \
-        """
-
-#------------------------------------------ core-level spatial analysis --------------------------------------------
-
-# Save adata subsets per core or tissue piece for core-level spatial analysis
-#----------------------------------------------------------------
+####################################################################################################################
+# Save each core or tissue piece as a separate AnnData object for spatial analysis
+####################################################################################################################
 checkpoint core_level_adata:
     input:
-        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_w_v1.7.h5ad" # from utils.preprocess_adata function removed v1.7 samples
+        adata = adata_processed_path
     output:
         output_dir_cores = directory(data_dir + f'adata_per_sample/{phenotyping_level}/')
     #conda:
@@ -253,7 +72,7 @@ checkpoint core_level_adata:
         -o {output.output_dir_cores} \
         """
 
-
+#+++++++++++++++++++++++++++++++++++++++ 3 SPATIALLY ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
 # Spatial analysis per core or tissue piece
 #-------------------------------------------------------------------------------------------------------------------
 rule spatial_analysis_per_core:
@@ -273,7 +92,7 @@ rule spatial_analysis_per_core:
     #    "xenium_py310"
     shell:
         """
-        python3 scripts/analysis_and_plotting/spatial_analysis_core_level.py \
+        python3 scripts/analysis_and_plotting/spatial_analysis.py \
         -i {input.adata_core_subset} \
         --celltype_key {params.celltype_key} \
         --celltype_list {params.celltype_list} \
@@ -281,32 +100,32 @@ rule spatial_analysis_per_core:
         -o_plots {output_dir_plots}/spatial/per_sample/{wildcards.core}/ \
         """
 
-# Perform Ripley's L function analysis per core or tissue piece
-#-------------------------------------------------------------------------------------------------------------------
-rule cross_ripleys_per_core:
-    input:
-        adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
-    output:
-        ripleys_L = output_dir_results + 'spatial/per_sample/{core}/cross_ripley_B cell_vs_T cell regulatory.csv'
-    params:
-        celltype_key = phenotyping_level,
-        coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/cross_type_ripleys.py \
-        -i {input.adata_core_subset} \
-        --phen_level {params.celltype_key} \
-        --coi {params.coi} \
-        -o {output_dir_results}/spatial/per_sample/{wildcards.core}/ \
-        """
+# # Perform Ripley's L function analysis per core or tissue piece
+# #-------------------------------------------------------------------------------------------------------------------
+# rule cross_ripleys_per_core:
+#     input:
+#         adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
+#     output:
+#         ripleys_L = output_dir_results + 
+#     params:
+#         celltype_key = phenotyping_level,
+#         coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
+#     #conda:
+#     #    "xenium_py310"
+#     shell:
+#         """
+#         python3 scripts/analysis_and_plotting/cross_type_ripleys.py \
+#         -i {input.adata_core_subset} \
+#         --phen_level {params.celltype_key} \
+#         --coi {params.coi} \
+#         -o {output_dir_results}/spatial/per_sample/{wildcards.core}/ \
+#         """
 
 # Combine spatial analysis results 
 #-------------------------------------------------------------------------------------------------------------------
 rule combine_core_spatial_analysis_results:
     input:
-        combine_inputs = spatial_targets_core
+        combine_inputs
     output:
         combined_centrality_scores = output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
         combined_nhood_enrichment = output_dir_results + "spatial/combined/core_level/combined_neighbors_enrichment.pkl",
@@ -327,6 +146,8 @@ rule combine_core_spatial_analysis_results:
         -o_results {params.out_dir_results} \
         """
 
+# Combine spatial analysis results
+#-------------------------------------------------------------------------------------------------------------------
 rule stat_analysis_centrality_core_level:
     input:
         combined_centrality_scores = output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
@@ -352,34 +173,39 @@ rule stat_analysis_centrality_core_level:
         """
 
 
-# rule stat_analysis_nhood_core_level:
+
+
+
+
+
+
+
+
+#++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
+# cell fraction analysis is in Snakefile_analysis_cell_fraction 
+# (no need to split into core-level and patch-level analyses, as cell fraction analysis is done on the whole tissue level)
+
+#+++++++++++++++++++++++++++++++++++++++ 2 GENE EXPRESSION ANALYSIS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
+# rule gene_expression_analysis:
 #     input:
-#         combined_nhood_enrichment = output_dir_results + 'spatial/combined/core_level/combined_neighbors_enrichment.pkl'
+#         combined_adatas = adata_processed_path
 #     output:
-#         stat_results_report = output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+#         analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
+#     conda:
+#         "/appdata/users/P083831/conda_envs/scverse_py311"
 #     params:
-#         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
-#         in_dir = output_dir_results + 'spatial/combined/core_level/',
-#         out_dir_results = output_dir_results + 'spatial/combined/core_level/',
-#         out_dir_plots = output_dir_plots + 'spatial/combined/core_level/',
+#         out_plot_dir = f'plots/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
+#         out_results = f'results/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
+#         phen_level = phenotyping_level,
 #         exclude_flag = "--exclude_v17" if exclude_v17 else ""
-#     #conda:
-#     #    "xenium_py310"
+
 #     shell:
 #         """
-#         python3 scripts/analysis_and_plotting/stat_analysis_nhood_core.py \
-#         -i {params.in_dir} \
-#         --celltype_list {params.celltype_list} \
+#         python3 scripts/analysis_and_plotting/gex_analysis.py \
+# 	    -i {input.combined_adatas} \
+#         --phen_level {params.phen_level} \
 #         {params.exclude_flag} \
-#         -o_report {output.stat_results_report} \
-#         -o_results {params.out_dir_results} \
-#         -o_plots {params.out_dir_plots} \
+#         -o {output.analyzed_adatas} \
+#         --output_results {params.out_results} \
+#         --output_dir_plots {params.out_plot_dir}
 #         """
-
-
-
-
-        # combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
-        # combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl"
-
-
