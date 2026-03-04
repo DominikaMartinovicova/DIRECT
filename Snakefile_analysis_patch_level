@@ -35,8 +35,9 @@ def combine_inputs(wildcards):
 #-------------------------------------------------------------------------------------------------------------------
 data_dir = config["all"]["data_dir"]
 log_dir = config["all"]["log_dir"]
-output_dir_results = config["all"]["output_dir_results"]
-output_dir_plots = config["all"]["output_dir_plots"]
+phenotyping_level = config["phenotyping_level"]
+output_dir_results = config["all"]["output_dir_results"].format(phenotyping_level=phenotyping_level)
+output_dir_plots = config["all"]["output_dir_plots"].format(phenotyping_level=phenotyping_level)
 exclude_v17 = config["exclude_v17"]
 if exclude_v17:
     ex_v17 = "wo_v1.7"
@@ -48,8 +49,7 @@ print('Exclude v1.7 samples:', exclude_v17)
 patch_size = config["patch_size"]
 overlap = config["overlap"]
 
-phenotyping_level = config["phenotyping_level"]
-adata_path = config["adata_path"]
+adata_path = f"{data_dir}combined/{phenotyping_level}_combined_adatas.h5ad"
 #samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
 adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad"
 
@@ -67,7 +67,7 @@ rule all:
 ####################################################################################################################
 checkpoint patching:
     input:
-        adata = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis.h5ad" # from utils.preprocess_adata function removed v1.7 samples
+        adata = adata_processed_path
     output:
         output_dir_patches = directory(data_dir + f'adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/')
     params:
@@ -87,34 +87,6 @@ checkpoint patching:
         -o {output.output_dir_patches} \
         --plots_dir {params.plots_dir} \
         """
-
-
-#+++++++++++++++++++++++++++++++++++++++ 2 GENE EXPRESSION ANALYSIS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
-# rule gene_expression_analysis:
-#     input:
-#         combined_adatas = adata_processed_path
-#     output:
-#         analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
-#     conda:
-#         "/appdata/users/P083831/conda_envs/scverse_py311"
-#     params:
-#         out_plot_dir = f'plots/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
-#         out_results = f'results/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
-#         phen_level = phenotyping_level,
-#         exclude_flag = "--exclude_v17" if exclude_v17 else ""
-
-#     shell:
-#         """
-#         python3 scripts/analysis_and_plotting/gex_analysis.py \
-# 	    -i {input.combined_adatas} \
-#         --phen_level {params.phen_level} \
-#         {params.exclude_flag} \
-#         -o {output.analyzed_adatas} \
-#         --output_results {params.out_results} \
-#         --output_dir_plots {params.out_plot_dir}
-#         """
-
-
 
 #+++++++++++++++++++++++++++++++++++++++ 3 SPATIALLY ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
 # Spatial analysis per patch
@@ -144,6 +116,28 @@ rule spatial_analysis_per_patch:
         -o_plots {output_dir_plots}/spatial/per_patch/{patch_size}um_{overlap}um/{wildcards.patch}/ \
         """
 
+# Cross type Ripley's L function analysis
+#-------------------------------------------------------------------------------------------------------------------
+rule cross_ripleys:
+    input:
+        adata_patch_subset = data_dir + f'adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/patch_{{patch}}.h5ad'
+    output:
+        ripleys_L = directory(output_dir_results + f'spatial/per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/{{patch}}/')
+    params:
+        celltype_key = phenotyping_level,
+        coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/cross_type_ripleys.py \
+        -i {input.adata_patch_subset} \
+        --phen_level {params.celltype_key} \
+        --coi {params.coi} \
+        -o {output_dir_results}/spatial/per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/{wildcards.patch}/ \
+        """
+
+
 # Combine spatial analysis results 
 #-------------------------------------------------------------------------------------------------------------------
 rule combine_spatial_analysis_results:
@@ -159,7 +153,7 @@ rule combine_spatial_analysis_results:
         adata_path = data_dir + f"/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/adata_patches_gex.h5ad",
         in_dir = output_dir_results + f'spatial/per_patch/{patch_size}um_{overlap}um/',
         out_dir_results = output_dir_results + f'spatial/combined/{patch_size}um_{overlap}um/',
-        out_dir_plots = output_dir_plots + f'spatial/combined/{patch_size}um_{overlap}um/'
+        metadata_path = data_dir + f'adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/patches_metadata.csv'
     #conda:
     #    "xenium_py310"
     shell:
@@ -167,9 +161,50 @@ rule combine_spatial_analysis_results:
         python3 scripts/analysis_and_plotting/combine_spatial_results.py \
         -i {params.in_dir} \
         --adata {params.adata_path} \
+        --metadata {params.metadata_path} \
         -o_results {params.out_dir_results} \
-        -o_plots {params.out_dir_plots} \
         """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -179,6 +214,31 @@ rule combine_spatial_analysis_results:
 # (no need to split into core-level and patch-level analyses, as cell fraction analysis is done on the whole tissue level)
 
 
+
+#+++++++++++++++++++++++++++++++++++++++ 2 GENE EXPRESSION ANALYSIS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
+# rule gene_expression_analysis:
+#     input:
+#         combined_adatas = adata_processed_path
+#     output:
+#         analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas_gex.h5ad"
+#     conda:
+#         "/appdata/users/P083831/conda_envs/scverse_py311"
+#     params:
+#         out_plot_dir = f'plots/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
+#         out_results = f'results/analysis/{phenotyping_level}/gene_expression_{ex_v17}/',
+#         phen_level = phenotyping_level,
+#         exclude_flag = "--exclude_v17" if exclude_v17 else ""
+
+#     shell:
+#         """
+#         python3 scripts/analysis_and_plotting/gex_analysis.py \
+# 	    -i {input.combined_adatas} \
+#         --phen_level {params.phen_level} \
+#         {params.exclude_flag} \
+#         -o {output.analyzed_adatas} \
+#         --output_results {params.out_results} \
+#         --output_dir_plots {params.out_plot_dir}
+#         """
 
 
 

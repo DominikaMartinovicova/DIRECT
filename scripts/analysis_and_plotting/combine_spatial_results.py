@@ -18,7 +18,6 @@
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 0 Import libraries and parse arguments
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-from requests import patch
 import scanpy as sc
 import squidpy as sq
 import matplotlib.pyplot as plt
@@ -43,6 +42,9 @@ def parse_args():
     parser.add_argument('--adata', help='path to adata object with all samples combined',
                         dest='adata',
                         type=str)
+    parser.add_argument('--metadata', help='path to metadata file with sample information',
+                        dest='metadata',
+                        type=str)
     parser.add_argument('-o_results', help='path to output dir for results',
                         dest='output_dir_results',
                         type=str)
@@ -64,10 +66,7 @@ os.makedirs(output_dir_results, exist_ok=True)
 #--------------------------------------------------------------------------------
 adata = sc.read_h5ad(args.adata)
 print(adata)
-if 'patch' in adata.obs.columns:
-    meta_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number','pt_id', 'treatment', 'structure', 'structure_core', 'patch']].drop_duplicates().set_index('patch')
-else:
-    meta_info = adata.obs[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number','pt_id', 'treatment', 'structure', 'structure_core']].drop_duplicates().set_index('sample')
+meta_info = pd.read_csv(args.metadata, index_col=0)
 print(meta_info)
 
 samples_list = meta_info.index.tolist()  #list of cores to combine
@@ -134,12 +133,11 @@ for sample in centrality_results.keys():
 
 # Add sample info
 degree_centrality_scores = degree_centrality_scores.transpose()
-#degree_centrality_scores = degree_centrality_scores.join(core_info[['sample_type', 'MPR', 'pt_id', 'treatment_scheme', 'treatment', 'structure']], how='left')
 degree_centrality_scores = degree_centrality_scores.join(meta_info, how='left')
 
 average_clustering_scores = average_clustering_scores.transpose()
-#average_clustering_scores = average_clustering_scores.join(core_info[['sample_type', 'MPR', 'pt_id', 'treatment_scheme', 'treatment', 'structure']], how='left')
 average_clustering_scores = average_clustering_scores.join(meta_info, how='left')
+
 closeness_centrality_scores = closeness_centrality_scores.transpose()
 closeness_centrality_scores = closeness_centrality_scores.join(meta_info, how='left')
 
@@ -153,8 +151,10 @@ print('Combining neighborhood enrichments...')
 combined_nhood_enrichment = {}
 
 for sample in nhood_results.keys():
+    print(f"Combining neighborhood enrichment for {sample}")
     combined_nhood_enrichment[sample] = nhood_results[sample]
     for info in meta_info.columns:
+        print(f"Adding {info} to {sample}")
         combined_nhood_enrichment[sample][info] = meta_info.loc[sample, info]
 
 #print(combined_nhood_enrichment)

@@ -14,7 +14,7 @@
 #       b. adata features - cell type fractions
 #       (c. adata features - spatial stats (save adata for each patch to be able to paralellize spatial statistics calculation in another script))
 #   4 Save patches individually as adata 
-#
+#   5 Save metadata about patches 
 #
 # Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
 #
@@ -251,6 +251,16 @@ for adata, suffix in [(adata_patches_gex, 'gex'), (adata_patches_ct, 'ctFraction
     plt.close()
 
     adata.write_h5ad(os.path.join(args.output_dir_patches,f'adata_patches_{suffix}.h5ad'))
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 5 Save metadata about patches
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+metadata = adata.obs.copy()
+metadata = metadata[metadata['patch'].isin(patches_to_keep)][['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number','pt_id', 'treatment', 'structure', 'structure_core', 'patch']]
+metadata = metadata.drop_duplicates().set_index('patch')
+metadata.index = metadata.index.str.replace('patch_','', regex=False)
+print(metadata)
+metadata.to_csv(os.path.join(args.output_dir_patches,f'patches_metadata.csv'))
 
 
 print('Done.')

@@ -95,7 +95,6 @@ def reindex_vector(vec, present, all_types):
 # Read adata
 print('Reading data...')
 adata = sc.read_h5ad(args.input)
-
 present_celltypes = list(adata.obs[celltype_key].cat.categories)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
