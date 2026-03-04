@@ -1,0 +1,13 @@
+
+all:
+  data_dir: 'data/'
+  log_dir: 'logs/analysis/'
+  output_dir_results: 'results/analysis/{phenotyping_level}/'
+  output_dir_plots: 'plots/analysis/{phenotyping_level}/'
+
+exclude_v17: False
+
+phenotyping_level: 'Neutro_Epi_extImm_pooled_A_EM_N'
+
+patch_size: 5000
+overlap: 50

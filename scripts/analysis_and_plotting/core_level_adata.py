@@ -65,5 +65,9 @@ for core in cores:
     output_path = os.path.join(args.output_dir_adata, f'{core}.h5ad')
     adata_core.write_h5ad(output_path)
 
-
+metadata = adata.obs.copy()
+metadata = metadata[['sample', 'sample_type', 'regression', "MPR", "treatment_scheme", 'T_number','pt_id', 'treatment', 'structure', 'structure_core']]
+metadata = metadata.drop_duplicates().set_index('sample')
+print(metadata)
+metadata.to_csv(os.path.join(args.output_dir_adata,f'samples_metadata.csv'))
 

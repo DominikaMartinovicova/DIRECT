@@ -49,9 +49,7 @@ adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        #expand(output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl', core=ripleys_L_core)
-        output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl',
-        #ripleys_L_core
+        output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
 
 
 
@@ -135,18 +133,19 @@ rule combine_core_spatial_analysis_results:
     params:
         adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis_w_v1.7.h5ad",
         in_dir = output_dir_results + 'spatial/per_sample/',
-        out_dir_results = output_dir_results + 'spatial/combined/core_level/'
+        out_dir_results = output_dir_results + 'spatial/combined/core_level/',
+        metadata_path = data_dir + f"/adata_per_sample/{phenotyping_level}/samples_metadata.csv"
     #conda:
     #    "xenium_py310"
     shell:
         """
-        python3 scripts/analysis_and_plotting/combine_core_spatial_results.py \
+        python3 scripts/analysis_and_plotting/combine_spatial_results.py \
         -i {params.in_dir} \
         --adata {params.adata_path} \
         -o_results {params.out_dir_results} \
         """
 
-# Combine spatial analysis results
+# Compare degree centrality scores between groups of samples (e.g. responders vs non-responders) and plot results
 #-------------------------------------------------------------------------------------------------------------------
 rule stat_analysis_centrality_core_level:
     input:
