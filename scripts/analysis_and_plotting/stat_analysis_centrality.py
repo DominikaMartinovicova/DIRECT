@@ -217,30 +217,30 @@ def stat_analysis_centrality_scores_box_within_sampletype(input_file, output_dir
 
 # Centrality scores analysis and plotting - lineplot with paired samples connected by lines
 #-----------------------------------------------------------------------------
-def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_dir_results, category, exclude_v17, stat_test, cell_type_list):       
-    # Keep only patients with matched biopsy and resection samples
-    resection_pts = df[df['sample_type']=='Resection']['pt_id'].tolist()
-    biopsy_pts = df[df['sample_type']=='Biopsy']['pt_id'].tolist()
-    paired_pts = list(set(resection_pts) & set(biopsy_pts))
-    paired_pt_df = df[df['pt_id'].isin(paired_pts)]
-
-    category_map = paired_pt_df[[category, 'pt_id', ]].drop_duplicates() if category in ['MPR', 'treatment'] else paired_pt_df[['pt_id']].drop_duplicates()
-    pairs_df = paired_pt_df.groupby(['sample_type', 'pt_id'], observed=True).mean(numeric_only=True).reset_index()
+def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):       
+    # Common setup
+    groups = sorted(input_file[group].unique())
+    id_vars = ['sample_id',group, category] if category else ['sample_id',group]
+    scores_df = input_file[id_vars + cell_type_list].copy()
+    scores_df_melted = scores_df.melt(id_vars=id_vars, var_name='cell_type', value_name=key)
     
-    pairs_df = pairs_df.merge(category_map, on=['pt_id'], how='left')
-    print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+    # Determine plot parameters
+    col_order = ['>=90', '<90'] if category == "MPR" else None
+    col = category if category else None
 
-    if category == None:       # Do not split into groups, compare biopsy vs resection for all patients
-        scores_df_melted = pairs_df.melt(id_vars=['pt_id', 'sample_type'], value_vars=cell_type_list, var_name='cell_type', value_name=key)
-        #scores_df_melted['variable'] = scores_df_melted['cell_type']
-    
-        # Plot stripplot with lines connecting paired samples
-        plt.figure(figsize=(12,6))
-        ax = sns.stripplot(data = scores_df_melted, x = 'cell_type', y = key, hue='sample_type',hue_order=['Biopsy', 'Resection'], dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'})
-        
+    # Create plot
+    g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='box', palette='tab20', height=6, aspect=1.5)
+
+    # Process each facet
+    axes = g.axes.flat if category else [g.ax]
+    facet_data = list(g.facet_data()) if category else [(None, input_file)]
+
+    for ax, (facet_key, subdata) in zip(axes, facet_data): 
+        cat_value = g.col_names[facet_key[1]]
         # Prepare the data for line plotting
-        wide = scores_df_melted.pivot_table(index='pt_id', columns=['cell_type', 'sample_type'], values=key)
-        categories = scores_df_melted['cell_type'].unique()
+        wide = subdata.pivot_table(index='pt_id', columns=['cell_type', 'sample_type'], values=key)
+        # x positions of categorical axis
+        categories = subdata['cell_type'].unique()
         xticks = ax.get_xticks()
         x_map = dict(zip(categories, xticks))
         offset = 0.18 # offset for biopsy vs resection points
@@ -254,101 +254,116 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
                 y_bio = row['Biopsy']
                 y_res = row['Resection']
                 color = 'blue' if y_res > y_bio else 'red'
-                ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
+                ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)   
+
+        if category:
+            # make the subset_df in the same format as the one without category to be able to use the same function for stat testing and annotation, from melted format to wide format
+            subset_df = subdata.pivot(index=id_vars, columns='cell_type', values=key).reset_index()
+            subset_df_melted = subdata
+        else:
+            subset_df = subdata[id_vars + cell_type_list]
+            subset_df_melted = subset_df.melt(id_vars=id_vars, value_vars=cell_type_list, var_name='cell_type', value_name=key)
+        _, stat_df_annot = stat_testing_two_groups(subset_df, cell_type_list, stat_test, group, groups)
         
-        stat_df, stat_df_annot = paired_stat_testing(pairs_df, cell_type_list, stat_test)
-        if exclude_v17==False:
-            stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_w_v1.7.csv', index=False)
-            plt.title(f"{key} in Biopsy vs Resection ({stat_test.__name__})")
-            file_name =  f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_w_v1.7.svg'
-        elif exclude_v17==True:
-            stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_wo_v1.7.csv', index=False)
-            plt.title(f"{key} in Biopsy vs Resection (excluding v1.7 treatment scheme) ({stat_test.__name__})")
-            file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_wo_v1.7.svg'
-
-
-        # Generate pairs for significant comparisons only
+        # Annotate significant results
         alpha = 0.05
-        sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
-        if len(sig_df) > 1:
+        sig_df = stat_df_annot[stat_df_annot["pval"] < alpha].copy().reset_index(drop=True)
+        if not sig_df.empty:
             pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
-            annot = Annotator(ax, pairs, data=scores_df_melted, x='cell_type', y=key, hue='sample_type')
+            annot = Annotator(ax, pairs, data=subset_df_melted, x='cell_type', y=key, hue=group)
             annot.configure(text_format="star")
             annot.set_pvalues_and_annotate(sig_df['pval'])
-        else:
-            print(f"No significant differences found for {key} with {stat_test.__name__}. No asterisks will be added to the plot.")
 
-        plt.xticks(rotation=45, ha='right')
-        plt.xlabel("Cell Type")
-        plt.ylabel(key)
-        plt.legend(title='Sample Type')
-        plt.tight_layout()
-        plt.savefig(file_name, format='svg', bbox_inches='tight')
-        plt.close()
+    # File naming helper
+    suffix = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
+    cat_suffix = f'{category}' if category else ''
+    base_filename = f'{output_dir_plots}centrality_scores/{key}_box_{group}_{cat_suffix}_{stat_test.__name__}_{suffix}.svg'
 
-    elif category != None:     # Split into groups, e.g. compare biopsy vs resection separately for low vs high MPR
-        scores_df_melted = pairs_df.melt(id_vars=['pt_id', 'sample_type', category], var_name='cell_type', value_name=key)
-        # to match the order of the categories in other plots
-        if category == "MPR":
-            col_order = ['>=90', '<90']
-        else:
-            col_order = None
-        g = sns.catplot(data=scores_df_melted, x='cell_type', y=key, hue='sample_type', hue_order=['Biopsy', 'Resection'], col=category, col_order=col_order, kind='strip', dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, height=6, aspect=1.5)
-
-        # Loop over each axis to add lines
-        for ax, (facet_key, subdata) in zip(g.axes.flat, g.facet_data()):
-            cat_value = g.col_names[facet_key[1]]
-            # Prepare the data for line plotting
-            wide = subdata.pivot_table(index='pt_id', columns=['cell_type', 'sample_type'], values=key)
-            # x positions of categorical axis
-            categories = subdata['cell_type'].unique()
-            xticks = ax.get_xticks()
-            x_map = dict(zip(categories, xticks))
-            offset = 0.18 # offset for biopsy vs resection points
-
-            # Draw lines connecting paired samples
-            for celltype in categories:
-                sub = wide[celltype].dropna()
-                for _, row in sub.iterrows():
-                    x_left = x_map[celltype] - offset   # biopsy x-position
-                    x_right = x_map[celltype] + offset  # resection x-position
-                    y_bio = row['Biopsy']
-                    y_res = row['Resection']
-                    color = 'blue' if y_res > y_bio else 'red'
-                    ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
-                
-            subset_df = pairs_df[pairs_df[category]==cat_value]
-            subset_df_melted = subset_df.melt(id_vars=['pt_id', 'sample_type', category], value_vars=cell_type_list, var_name='cell_type', value_name=key)
-            stat_df, stat_df_annot = paired_stat_testing(subset_df, cell_type_list, stat_test)
-
-            if exclude_v17==False:
-                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_{category}_w_v1.7.csv', index=False)
-                file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_{category}_w_v1.7.svg'
-                title = f"{key} in Biopsy vs Resection - {category} ({stat_test.__name__})"
-            elif exclude_v17==True:                        
-                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_{category}_wo_v1.7.csv', index=False)
-                file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_{category}_wo_v1.7.svg'
-                title = f"{key} in Biopsy vs Resection - {category} (excluding v1.7 treatment scheme) ({stat_test.__name__})"
-            # Generate pairs for significant comparisons only
-            alpha = 0.05
-            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
-            if len(sig_df) > 1:
-                pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
-                annot = Annotator(ax, pairs, data=subset_df_melted, x='cell_type', y=key, hue='sample_type')
-                annot.configure(text_format="star")
-                annot.set_pvalues_and_annotate(sig_df['pval'])
-            else:
-                print(f"No significant differences found for {key} with {stat_test.__name__}. No asterisks will be added to the plot.")
-        
+    # Set labels and title
+    if category:
+        title = f"{key} in {groups[0]} vs {groups[1]} in {category}"
+        if exclude_v17:
+            title += " (excluding v1.7 treatment scheme)"
+        title += f" ({stat_test.__name__})"
         g.set_xticklabels(rotation=45, ha='right')
-        g.set_xlabels("Cell Type")
-        g.set_ylabels(key)
-        g.legend.set_title('Sample Type')
-        g.legend.set_loc('upper right')
-        plt.suptitle(title, y=1.02)
-        plt.tight_layout()
-        plt.savefig(file_name, format='svg', bbox_inches='tight')
-        plt.close()
+        g.set_xlabels('Cell type')
+        g.set_ylabels(f'{key} score')
+        plt.suptitle(title, y=1.03)
+    else:
+        plt.title(f"{key} in {groups[0]} vs {groups[1]} ({stat_test.__name__})")
+        plt.xticks(rotation=45, ha='right')
+        plt.xlabel('Cell type')
+        plt.ylabel(f'{key} score')
+    
+    g.legend.set_title('Sample type')
+    g.legend.set_loc('upper right')
+    plt.tight_layout()
+    plt.savefig(base_filename, format='svg', bbox_inches='tight')
+    plt.close()
+
+    # elif category != None:     # Split into groups, e.g. compare biopsy vs resection separately for low vs high MPR
+    #     scores_df_melted = pairs_df.melt(id_vars=['pt_id', 'sample_type', category], var_name='cell_type', value_name=key)
+    #     # to match the order of the categories in other plots
+    #     if category == "MPR":
+    #         col_order = ['>=90', '<90']
+    #     else:
+    #         col_order = None
+    #     g = sns.catplot(data=scores_df_melted, x='cell_type', y=key, hue='sample_type', hue_order=['Biopsy', 'Resection'], col=category, col_order=col_order, kind='strip', dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, height=6, aspect=1.5)
+
+    #     # Loop over each axis to add lines
+    #     for ax, (facet_key, subdata) in zip(g.axes.flat, g.facet_data()):
+    #         cat_value = g.col_names[facet_key[1]]
+    #         # Prepare the data for line plotting
+    #         wide = subdata.pivot_table(index='pt_id', columns=['cell_type', 'sample_type'], values=key)
+    #         # x positions of categorical axis
+    #         categories = subdata['cell_type'].unique()
+    #         xticks = ax.get_xticks()
+    #         x_map = dict(zip(categories, xticks))
+    #         offset = 0.18 # offset for biopsy vs resection points
+
+    #         # Draw lines connecting paired samples
+    #         for celltype in categories:
+    #             sub = wide[celltype].dropna()
+    #             for _, row in sub.iterrows():
+    #                 x_left = x_map[celltype] - offset   # biopsy x-position
+    #                 x_right = x_map[celltype] + offset  # resection x-position
+    #                 y_bio = row['Biopsy']
+    #                 y_res = row['Resection']
+    #                 color = 'blue' if y_res > y_bio else 'red'
+    #                 ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
+                
+    #         subset_df = pairs_df[pairs_df[category]==cat_value]
+    #         subset_df_melted = subset_df.melt(id_vars=['pt_id', 'sample_type', category], value_vars=cell_type_list, var_name='cell_type', value_name=key)
+    #         stat_df, stat_df_annot = paired_stat_testing(subset_df, cell_type_list, stat_test)
+
+    #         if exclude_v17==False:
+    #             stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_{category}_w_v1.7.csv', index=False)
+    #             file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_{category}_w_v1.7.svg'
+    #             title = f"{key} in Biopsy vs Resection - {category} ({stat_test.__name__})"
+    #         elif exclude_v17==True:                        
+    #             stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_{category}_wo_v1.7.csv', index=False)
+    #             file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_{category}_wo_v1.7.svg'
+    #             title = f"{key} in Biopsy vs Resection - {category} (excluding v1.7 treatment scheme) ({stat_test.__name__})"
+    #         # Generate pairs for significant comparisons only
+    #         alpha = 0.05
+    #         sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
+    #         if len(sig_df) > 1:
+    #             pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
+    #             annot = Annotator(ax, pairs, data=subset_df_melted, x='cell_type', y=key, hue='sample_type')
+    #             annot.configure(text_format="star")
+    #             annot.set_pvalues_and_annotate(sig_df['pval'])
+    #         else:
+    #             print(f"No significant differences found for {key} with {stat_test.__name__}. No asterisks will be added to the plot.")
+        
+    #     g.set_xticklabels(rotation=45, ha='right')
+    #     g.set_xlabels("Cell Type")
+    #     g.set_ylabels(key)
+    #     g.legend.set_title('Sample Type')
+    #     g.legend.set_loc('upper right')
+    #     plt.suptitle(title, y=1.02)
+    #     plt.tight_layout()
+    #     plt.savefig(file_name, format='svg', bbox_inches='tight')
+    #     plt.close()
 
 
 def stat_analysis_centrality_scores_shift_box(input_file, output_dir_report, output_dir_plots, output_dir_results, category, exclude_v17, stat_test, cell_type_list):
@@ -577,7 +592,7 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
                     metainfo_map = paired_df[['pt_id']].drop_duplicates()
                 pairs_df = centrality_scores_df_paired.merge(metainfo_map, on=['pt_id'], how='left')
                 print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
-                #stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list)
+                stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list)
    
    
     #     stat_analysis_centrality_scores_shift_box(input_file=centrality_scores, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
