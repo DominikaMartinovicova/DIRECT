@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# stat_analysis_spatial_results.py
+# stat_analysis_centrality_core.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
 #   Analyze and plot combined spatial analysis results across samples (core-/tissue-level).
@@ -25,8 +25,6 @@
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 0 Import libraries and parse arguments
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-import scanpy as sc
-import squidpy as sq
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -34,7 +32,6 @@ import pandas as pd
 import os
 import pickle
 import argparse
-import squidpy as sq
 from scipy.stats import wilcoxon, ttest_rel, ttest_ind, mannwhitneyu
 from statannotations.Annotator import Annotator
 
@@ -66,6 +63,7 @@ def parse_args():
     return args
 
 args = parse_args()
+
 input_dir=args.input
 exclude_v17=args.exclude_v17
 print(f'Excluding v1.7 samples: {exclude_v17}')

@@ -3,7 +3,7 @@
 # combine_spatial_results.py
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
-#   Combine the results of spatial analysis from all cores into one file 
+#   Combine the results of spatial analysis from all samples into one file 
 #   per analysis type.
 #
 #
@@ -12,6 +12,11 @@
 #
 # Usage:
 #        """
+#        python3 scripts/analysis_and_plotting/combine_spatial_results.py \
+#        -i {params.in_dir} \
+#        --adata {params.adata_path} \
+#        --metadata {params.metadata_path} \
+#        -o_results {params.out_dir_results} \
 #        """
 
 
@@ -48,9 +53,6 @@ def parse_args():
     parser.add_argument('-o_results', help='path to output dir for results',
                         dest='output_dir_results',
                         type=str)
-    # parser.add_argument('--samples_list', help='list of samples to combine',
-    #                     dest='samples_list',
-    #                     type=str)
     args = parser.parse_args()
     return args
 
@@ -109,7 +111,6 @@ print("Interaction matrix - " + str(len(interaction_results)))
 print("Cooccurrence probabilities - " + str(len(cooccurrence_results)))
 
 
-
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Combine results
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -151,10 +152,8 @@ print('Combining neighborhood enrichments...')
 combined_nhood_enrichment = {}
 
 for sample in nhood_results.keys():
-    print(f"Combining neighborhood enrichment for {sample}")
     combined_nhood_enrichment[sample] = nhood_results[sample]
     for info in meta_info.columns:
-        print(f"Adding {info} to {sample}")
         combined_nhood_enrichment[sample][info] = meta_info.loc[sample, info]
 
 #print(combined_nhood_enrichment)

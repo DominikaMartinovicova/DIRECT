@@ -49,7 +49,9 @@ adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
+        #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
+        #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+        output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
 
 
 
@@ -129,7 +131,7 @@ rule combine_core_spatial_analysis_results:
         combined_nhood_enrichment = output_dir_results + "spatial/combined/core_level/combined_neighbors_enrichment.pkl",
         combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
         combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl",
-        combined_ripleys_L = output_dir_results + f'spatial/combined/core_level/combined_ripleys_L.pkl'
+        #combined_ripleys_L = output_dir_results + f'spatial/combined/core_level/combined_ripleys_L.pkl'
     params:
         adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis_w_v1.7.h5ad",
         in_dir = output_dir_results + 'spatial/per_sample/',
@@ -142,6 +144,7 @@ rule combine_core_spatial_analysis_results:
         python3 scripts/analysis_and_plotting/combine_spatial_results.py \
         -i {params.in_dir} \
         --adata {params.adata_path} \
+        --metadata {params.metadata_path} \
         -o_results {params.out_dir_results} \
         """
 
@@ -154,7 +157,6 @@ rule stat_analysis_centrality_core_level:
         stat_results_report = output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
     params:
         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
-        in_dir = output_dir_results + 'spatial/combined/core_level/',
         out_dir_results = output_dir_results + 'spatial/combined/core_level/',
         out_dir_plots = output_dir_plots + 'spatial/combined/core_level/',
         exclude_flag = "--exclude_v17" if exclude_v17 else ""
@@ -162,8 +164,8 @@ rule stat_analysis_centrality_core_level:
     #    "xenium_py310"
     shell:
         """
-        python3 scripts/analysis_and_plotting/stat_analysis_centrality_core.py \
-        -i {params.in_dir} \
+        python3 scripts/analysis_and_plotting/stat_analysis_centrality.py \
+        -i {input.combined_centrality_scores} \
         --celltype_list {params.celltype_list} \
         {params.exclude_flag} \
         -o_report {output.stat_results_report} \
