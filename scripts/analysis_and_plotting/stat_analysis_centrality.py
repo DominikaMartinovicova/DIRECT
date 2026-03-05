@@ -220,7 +220,7 @@ def stat_analysis_centrality_scores_box_within_sampletype(input_file, output_dir
 def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):       
     # Common setup
     groups = sorted(input_file[group].unique())
-    id_vars = ['sample_id',group, category] if category else ['sample_id',group]
+    id_vars = ['pt_id',group, category] if category else ['pt_id',group]
     scores_df = input_file[id_vars + cell_type_list].copy()
     scores_df_melted = scores_df.melt(id_vars=id_vars, var_name='cell_type', value_name=key)
     
@@ -229,33 +229,14 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
     col = category if category else None
 
     # Create plot
-    g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='box', palette='tab20', height=6, aspect=1.5)
+    g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='strip', jitter=False, dodge = True, palette='tab20', height=6, aspect=1.5)
 
     # Process each facet
     axes = g.axes.flat if category else [g.ax]
     facet_data = list(g.facet_data()) if category else [(None, input_file)]
 
+    print(facet_data)
     for ax, (facet_key, subdata) in zip(axes, facet_data): 
-        cat_value = g.col_names[facet_key[1]]
-        # Prepare the data for line plotting
-        wide = subdata.pivot_table(index='pt_id', columns=['cell_type', 'sample_type'], values=key)
-        # x positions of categorical axis
-        categories = subdata['cell_type'].unique()
-        xticks = ax.get_xticks()
-        x_map = dict(zip(categories, xticks))
-        offset = 0.18 # offset for biopsy vs resection points
-
-        # Draw lines connecting paired samples
-        for celltype in categories:
-            sub = wide[celltype].dropna()
-            for _, row in sub.iterrows():
-                x_left = x_map[celltype] - offset   # biopsy x-position
-                x_right = x_map[celltype] + offset  # resection x-position
-                y_bio = row['Biopsy']
-                y_res = row['Resection']
-                color = 'blue' if y_res > y_bio else 'red'
-                ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)   
-
         if category:
             # make the subset_df in the same format as the one without category to be able to use the same function for stat testing and annotation, from melted format to wide format
             subset_df = subdata.pivot(index=id_vars, columns='cell_type', values=key).reset_index()
@@ -592,7 +573,7 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
                     metainfo_map = paired_df[['pt_id']].drop_duplicates()
                 pairs_df = centrality_scores_df_paired.merge(metainfo_map, on=['pt_id'], how='left')
                 print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
-                stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list)
+                stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list, key=key)
    
    
     #     stat_analysis_centrality_scores_shift_box(input_file=centrality_scores, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
