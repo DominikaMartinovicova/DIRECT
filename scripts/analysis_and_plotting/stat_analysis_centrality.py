@@ -560,18 +560,7 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
     else:
         centrality_scores_df = centrality_scores[key]
     centrality_scores_df['sample_id'] = centrality_scores_df.index
-
-    # Create also dataframe with only paired samples
-    resection_pts = centrality_scores_df[centrality_scores_df['sample_type']=='Resection']['pt_id'].tolist()
-    biopsy_pts = centrality_scores_df[centrality_scores_df['sample_type']=='Biopsy']['pt_id'].tolist()
-    paired_pts = list(set(resection_pts) & set(biopsy_pts))
-    paired_pt_df = centrality_scores_df[centrality_scores_df['pt_id'].isin(paired_pts)]
-
-    category_map = paired_pt_df[[category, 'pt_id']].drop_duplicates() if category in ['MPR', 'treatment'] else paired_pt_df[['pt_id']].drop_duplicates()
-    centrality_scores_df_paired = paired_pt_df.groupby(['sample_type', 'pt_id'], observed=True).mean(numeric_only=True).reset_index()
-    
-    pairs_df = pairs_df.merge(category_map, on=['pt_id'], how='left')
-    print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+    centrality_scores_df['regression'] = centrality_scores_df['regression'].astype('category')
 
     for group in ['sample_type', 'structure', 'structure_core']:
         #print(f'Analyzing {group}')
@@ -579,8 +568,16 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
             centrality_scores_df = centrality_scores_df[centrality_scores_df['sample_type']=='Resection']
         for category in categories:
             #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
-            #if group == 'sample_type':
-                #stat_analysis_centrality_scores_line(input_file=centrality_scores_df_paired, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list)
+            if group == 'sample_type':
+                paired_df = centrality_scores_df.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
+                centrality_scores_df_paired = paired_df.groupby(['pt_id', 'sample_type'], observed=True).mean(numeric_only=True).reset_index()
+                if category is not None:
+                    metainfo_map = paired_df[['pt_id', category]].drop_duplicates()
+                else:
+                    metainfo_map = paired_df[['pt_id']].drop_duplicates()
+                pairs_df = centrality_scores_df_paired.merge(metainfo_map, on=['pt_id'], how='left')
+                print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+                #stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list)
    
    
     #     stat_analysis_centrality_scores_shift_box(input_file=centrality_scores, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
