@@ -114,9 +114,13 @@ def stat_analysis_centrality_scores_box(input_file, output_dir_plots, output_dir
     scores_df_melted = scores_df.melt(id_vars=id_vars, var_name='cell_type', value_name=key)
     
     # Determine plot parameters
-    col_order = ['>=90', '<90'] if category == "MPR" else None
+    if category != None:
+        col_order = ['>=90', '<90'] if category == "MPR" else sorted(input_file[category].unique())
+    else:
+        col_order = None
     col = category if category else None
-    
+    print('boxplot')
+    print(scores_df_melted)
     # Create plot
     g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='box', palette='tab20', height=6, aspect=1.5)
     
@@ -170,51 +174,6 @@ def stat_analysis_centrality_scores_box(input_file, output_dir_plots, output_dir
     plt.savefig(base_filename, format='svg', bbox_inches='tight')
     plt.close()
 
-def stat_analysis_centrality_scores_box_within_sampletype(input_file, output_dir_plots, output_dir_results, category, exclude_v17, stat_test, cell_type_list, key, single_group):
-    scores_df = input_file[[category] + cell_type_list].copy()
-    scores_df_melted = scores_df.melt(id_vars=category, var_name='cell_type', value_name=key)
-    
-    # Determine plot parameters
-    col_order = ['>=90', '<90'] if category == "MPR" else None
-    
-    # Create plot
-    g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=category, hue_order=col_order, kind='box', palette='tab20', height=6, aspect=1.5)
-    ax=g.ax
-
-    # File naming helper
-    suffix = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
-    cat_suffix = f'{category}' if category else ''
-    base_filename = f'{output_dir_plots}centrality_scores/{key}_box_{single_group}_{cat_suffix}_{stat_test.__name__}_{suffix}.svg'
-    print(category)
-    _, stat_df_annot = stat_testing_two_groups(scores_df, cell_type_list, stat_test, group=category, groups=scores_df[category].unique())
-        
-    # Annotate significant results
-    alpha = 0.05
-    sig_df = stat_df_annot[stat_df_annot["pval"] < alpha].copy().reset_index(drop=True)
-    if not sig_df.empty:
-        pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
-        annot = Annotator(ax, pairs, data=scores_df_melted, x='cell_type', y=key, hue=category)
-        annot.configure(text_format="star")
-        annot.set_pvalues_and_annotate(sig_df['pval'])
-    
-    # Set labels and title
-    title = f"{key} in {single_group} split on {category}"
-    if exclude_v17:
-        title += " (excluding v1.7 treatment scheme)"
-    title += f" ({stat_test.__name__})"
-    g.set_xticklabels(rotation=45, ha='right')
-    g.set_xlabels('Cell type')
-    g.set_ylabels(f'{key} score')
-    plt.suptitle(title, y=1.03)
-    g.legend.set_title('Sample type')
-    g.legend.set_loc('upper right')
-    plt.tight_layout()
-    plt.savefig(base_filename, format='svg', bbox_inches='tight')
-    plt.close()
-
-
-
-
 # Centrality scores analysis and plotting - lineplot with paired samples connected by lines
 #-----------------------------------------------------------------------------
 def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):       
@@ -225,11 +184,15 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
     scores_df_melted = scores_df.melt(id_vars=id_vars, var_name='cell_type', value_name=key)
     
     # Determine plot parameters
-    col_order = ['>=90', '<90'] if category == "MPR" else None
+    if category != None:
+        col_order = ['>=90', '<90'] if category == "MPR" else sorted(input_file[category].unique())
+    else:
+        col_order = None
     col = category if category else None
-
+    print('lineplot')
+    print(scores_df_melted)
     # Create plot
-    g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='strip', jitter=False, dodge = True, palette='tab20', height=6, aspect=1.5)
+    g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='strip',palette={groups[0]:'gray', groups[1]:'black'}, jitter=False, dodge = True, height=6, aspect=1.5, size=4)
 
     # Process each facet
     axes = g.axes.flat if category else [g.ax]
@@ -237,6 +200,11 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
 
     print(facet_data)
     for ax, (facet_key, subdata) in zip(axes, facet_data): 
+        # ---- Connect paired samples with lines ----
+        dodge_width = 0.4
+        n_groups = len(groups)
+        offsets = np.linspace(-dodge_width/2, dodge_width/2, n_groups)
+
         if category:
             # make the subset_df in the same format as the one without category to be able to use the same function for stat testing and annotation, from melted format to wide format
             subset_df = subdata.pivot(index=id_vars, columns='cell_type', values=key).reset_index()
@@ -244,8 +212,20 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
         else:
             subset_df = subdata[id_vars + cell_type_list]
             subset_df_melted = subset_df.melt(id_vars=id_vars, value_vars=cell_type_list, var_name='cell_type', value_name=key)
-        _, stat_df_annot = stat_testing_two_groups(subset_df, cell_type_list, stat_test, group, groups)
-        
+        _, stat_df_annot = stat_testing_two_groups(subset_df, cell_type_list, stat_test, group, groups)     
+
+        for i, cell in enumerate(cell_type_list):
+            for pt_id, pt_df in subset_df_melted[subset_df_melted['cell_type'] == cell].groupby('pt_id'):              
+                if pt_df[group].nunique() != 2:
+                    continue  # skip if pair incomplete
+                pt_df = pt_df.set_index(group)
+
+                y1 = pt_df.loc[groups[0], key]
+                y2 = pt_df.loc[groups[1], key]
+                x1 = i + offsets[0]
+                x2 = i + offsets[1]
+                ax.plot([x1, x2], [y1, y2], color="blue" if y2 > y1 else "red", alpha=0.6, linewidth=1)
+
         # Annotate significant results
         alpha = 0.05
         sig_df = stat_df_annot[stat_df_annot["pval"] < alpha].copy().reset_index(drop=True)
@@ -258,7 +238,7 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
     # File naming helper
     suffix = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
     cat_suffix = f'{category}' if category else ''
-    base_filename = f'{output_dir_plots}centrality_scores/{key}_box_{group}_{cat_suffix}_{stat_test.__name__}_{suffix}.svg'
+    base_filename = f'{output_dir_plots}centrality_scores/{key}_line_{group}_{cat_suffix}_{stat_test.__name__}_{suffix}.svg'
 
     # Set labels and title
     if category:
@@ -281,70 +261,6 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
     plt.tight_layout()
     plt.savefig(base_filename, format='svg', bbox_inches='tight')
     plt.close()
-
-    # elif category != None:     # Split into groups, e.g. compare biopsy vs resection separately for low vs high MPR
-    #     scores_df_melted = pairs_df.melt(id_vars=['pt_id', 'sample_type', category], var_name='cell_type', value_name=key)
-    #     # to match the order of the categories in other plots
-    #     if category == "MPR":
-    #         col_order = ['>=90', '<90']
-    #     else:
-    #         col_order = None
-    #     g = sns.catplot(data=scores_df_melted, x='cell_type', y=key, hue='sample_type', hue_order=['Biopsy', 'Resection'], col=category, col_order=col_order, kind='strip', dodge=True, jitter=False, size=4, alpha=0.7, palette={'Biopsy':'gray', 'Resection':'black'}, height=6, aspect=1.5)
-
-    #     # Loop over each axis to add lines
-    #     for ax, (facet_key, subdata) in zip(g.axes.flat, g.facet_data()):
-    #         cat_value = g.col_names[facet_key[1]]
-    #         # Prepare the data for line plotting
-    #         wide = subdata.pivot_table(index='pt_id', columns=['cell_type', 'sample_type'], values=key)
-    #         # x positions of categorical axis
-    #         categories = subdata['cell_type'].unique()
-    #         xticks = ax.get_xticks()
-    #         x_map = dict(zip(categories, xticks))
-    #         offset = 0.18 # offset for biopsy vs resection points
-
-    #         # Draw lines connecting paired samples
-    #         for celltype in categories:
-    #             sub = wide[celltype].dropna()
-    #             for _, row in sub.iterrows():
-    #                 x_left = x_map[celltype] - offset   # biopsy x-position
-    #                 x_right = x_map[celltype] + offset  # resection x-position
-    #                 y_bio = row['Biopsy']
-    #                 y_res = row['Resection']
-    #                 color = 'blue' if y_res > y_bio else 'red'
-    #                 ax.plot([x_left, x_right],[y_bio, y_res],color=color,linewidth=1,alpha=0.8)
-                
-    #         subset_df = pairs_df[pairs_df[category]==cat_value]
-    #         subset_df_melted = subset_df.melt(id_vars=['pt_id', 'sample_type', category], value_vars=cell_type_list, var_name='cell_type', value_name=key)
-    #         stat_df, stat_df_annot = paired_stat_testing(subset_df, cell_type_list, stat_test)
-
-    #         if exclude_v17==False:
-    #             stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_{category}_w_v1.7.csv', index=False)
-    #             file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_{category}_w_v1.7.svg'
-    #             title = f"{key} in Biopsy vs Resection - {category} ({stat_test.__name__})"
-    #         elif exclude_v17==True:                        
-    #             stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_paired_{key}_statistical_results_{category}_wo_v1.7.csv', index=False)
-    #             file_name = f'{output_dir_plots}centrality_scores/{key}_shifts_lineplot_{stat_test.__name__}_{category}_wo_v1.7.svg'
-    #             title = f"{key} in Biopsy vs Resection - {category} (excluding v1.7 treatment scheme) ({stat_test.__name__})"
-    #         # Generate pairs for significant comparisons only
-    #         alpha = 0.05
-    #         sig_df = stat_df_annot[stat_df_annot["pval"] < alpha ].copy().reset_index(drop=True)
-    #         if len(sig_df) > 1:
-    #             pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
-    #             annot = Annotator(ax, pairs, data=subset_df_melted, x='cell_type', y=key, hue='sample_type')
-    #             annot.configure(text_format="star")
-    #             annot.set_pvalues_and_annotate(sig_df['pval'])
-    #         else:
-    #             print(f"No significant differences found for {key} with {stat_test.__name__}. No asterisks will be added to the plot.")
-        
-    #     g.set_xticklabels(rotation=45, ha='right')
-    #     g.set_xlabels("Cell Type")
-    #     g.set_ylabels(key)
-    #     g.legend.set_title('Sample Type')
-    #     g.legend.set_loc('upper right')
-    #     plt.suptitle(title, y=1.02)
-    #     plt.tight_layout()
-    #     plt.savefig(file_name, format='svg', bbox_inches='tight')
-    #     plt.close()
 
 
 def stat_analysis_centrality_scores_shift_box(input_file, output_dir_report, output_dir_plots, output_dir_results, category, exclude_v17, stat_test, cell_type_list):
@@ -564,6 +480,9 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
             centrality_scores_df = centrality_scores_df[centrality_scores_df['sample_type']=='Resection']
         for category in categories:
             #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
+            if category != None:
+                #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
+            
             if group == 'sample_type':
                 paired_df = centrality_scores_df.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
                 centrality_scores_df_paired = paired_df.groupby(['pt_id', 'sample_type'], observed=True).mean(numeric_only=True).reset_index()
@@ -573,18 +492,8 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
                     metainfo_map = paired_df[['pt_id']].drop_duplicates()
                 pairs_df = centrality_scores_df_paired.merge(metainfo_map, on=['pt_id'], how='left')
                 print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
-                stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list, key=key)
-   
-   
-    #     stat_analysis_centrality_scores_shift_box(input_file=centrality_scores, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
-    #     stat_analysis_centrality_scores_foldchange_box(input_file=centrality_scores, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list)
-            if category != None:
-                for single_group in centrality_scores_df[group].unique():
-                    print(f'Analyzing category {category} in single group {single_group} in group {group}')
-                    centrality_score_df = centrality_scores_df[centrality_scores_df[group]==single_group]
-                    #stat_analysis_centrality_scores_box_within_sampletype(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key, single_group=single_group)
-    
-
+                #stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list, key=key)
+                stat_analysis_centrality_scores_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
 
 
 
