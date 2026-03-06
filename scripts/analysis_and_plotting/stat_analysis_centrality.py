@@ -263,6 +263,132 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
     plt.close()
 
 
+
+
+# Statistical analysis and plotting of fold change in centrality scores between biopsy and resection samples
+#------------------------------------------------------------------------------
+def stat_analysis_centrality_scores_foldchange_box(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):
+    groups = sorted(input_file[group].unique())
+    df_ref = input_file[input_file[group]==groups[0]].set_index(['pt_id'])[cell_type_list]
+    df_target = input_file[input_file[group]==groups[1]].set_index(['pt_id']).reindex(df_ref.index)[cell_type_list]
+    print(input_file)
+    # Calculate log2 fold change (log2(resection / biopsy)), handling division by zero
+    fc_df = np.log2(df_target.div(df_ref.replace(0, np.nan)))
+    fc_df = fc_df.replace([np.inf, -np.inf], np.nan)
+    print(fc_df)
+    id_vars = ['pt_id', category] if category else ['pt_id']
+    metainfo_map = input_file[id_vars].drop_duplicates()
+    fc_df = fc_df.merge(metainfo_map, on=['pt_id'], how='left').set_index('pt_id')
+    print(fc_df)
+
+    plt.figure(figsize=(12, 6))
+    if category is None:
+        ax = sns.boxplot(data=fc_df)
+    else:
+        fc_df_melt = pd.melt(fc_df,id_vars=[category], value_vars=cell_type_list, var_name="cell_type", value_name=key)
+        print(fc_df_melt)
+        ax = sns.boxplot(data=fc_df_melt, x="cell_type", y=key, hue=category, palette="tab20")
+
+    if category and stat_test:
+        stat_df, stat_df_annot = stat_testing_two_groups(fc_df, cell_type_list, stat_test, category, fc_df[category].unique())
+        sig_df = stat_df_annot[stat_df_annot["pval"] < 0.05].reset_index(drop=True)
+
+        if not sig_df.empty:
+            pairs = [((row.variable, row.group1), (row.variable, row.group2))for _, row in sig_df.iterrows()]
+            annot = Annotator(ax,pairs,data=fc_df_melt,x="cell_type",y=key, hue=category)
+            annot.configure(text_format="star")
+            annot.set_pvalues_and_annotate(sig_df["pval"])
+
+
+    # File naming helper
+    suffix = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
+    cat_suffix = f'{category}' if category else ''
+    base_filename = f'{output_dir_plots}centrality_scores/{key}_fc_box_{group}_{cat_suffix}_{stat_test.__name__}_{suffix}.svg'
+
+    # Set labels and title
+    if category:
+        title = f"{key} in {groups[0]} vs {groups[1]} in {category}"
+        if exclude_v17:
+            title += " (excluding v1.7 treatment scheme)"
+        title += f" ({stat_test.__name__})"
+        ax.set_xlabel('Cell type')
+        ax.set_ylabel(f'Log2FC {key} score')
+        plt.suptitle(title, y=1.03)
+    else:
+        plt.title(f"{key} in {groups[0]} vs {groups[1]} ({stat_test.__name__})")
+        plt.xlabel('Cell type')
+        plt.ylabel(f'Log2FC {key} score')
+    
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.savefig(base_filename, format='svg', bbox_inches='tight')
+    plt.close()
+
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# 2 Prepare data and run analysis
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Read in centrality scores file
+with open(centrality_scores_path, 'rb') as f:
+    centrality_scores = pickle.load(f)
+
+# Run analysis
+#------------------------------------------------------------------------------
+# specify categories to loop over based on whether v1.7 samples are included or not, since treatment scheme is only relevant if v1.7 samples are included
+if exclude_v17==True:
+    categories = [None, 'MPR']
+else:
+    categories = [None, 'MPR', 'treatment']
+
+
+# loop over different centrality measures
+for key in ['degree_centrality']:             #centrality_scores.keys():    
+    if exclude_v17==True:       # filter out v1.7 samples if exclude_v17 is True
+        centrality_scores_df = centrality_scores[key][~centrality_scores[key]['treatment_scheme'].str.contains('v1.7')]       
+    else:
+        centrality_scores_df = centrality_scores[key]
+    centrality_scores_df['sample_id'] = centrality_scores_df.index
+    centrality_scores_df['regression'] = centrality_scores_df['regression'].astype('category')
+
+    for group in ['sample_type', 'structure', 'structure_core']:
+        #print(f'Analyzing {group}')
+        if group == 'structure':
+            centrality_scores_df = centrality_scores_df[centrality_scores_df['sample_type']=='Resection']
+        for category in ['treatment']:#categories:
+            #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
+            #if category != None:
+                #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
+                
+            if group == 'sample_type':
+                paired_df = centrality_scores_df.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
+                centrality_scores_df_paired = paired_df.groupby(['pt_id', 'sample_type'], observed=True).mean(numeric_only=True).reset_index()
+                if category is not None:
+                    metainfo_map = paired_df[['pt_id', category]].drop_duplicates()
+                else:
+                    metainfo_map = paired_df[['pt_id']].drop_duplicates()
+                pairs_df = centrality_scores_df_paired.merge(metainfo_map, on=['pt_id'], how='left')
+                print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+                #stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list, key=key)
+                stat_analysis_centrality_scores_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def stat_analysis_centrality_scores_shift_box(input_file, output_dir_report, output_dir_plots, output_dir_results, category, exclude_v17, stat_test, cell_type_list):
     centrality_scores = input_file
     for key in centrality_scores.keys():
@@ -352,151 +478,3 @@ def stat_analysis_centrality_scores_shift_box(input_file, output_dir_report, out
             plt.tight_layout()
             plt.savefig(file_name, format='svg')
             plt.close()
-
-# Statistical analysis and plotting of fold change in centrality scores between biopsy and resection samples
-#------------------------------------------------------------------------------
-def stat_analysis_centrality_scores_foldchange_box(input_file, output_dir_report, output_dir_plots, output_dir_results, category, exclude_v17, stat_test, cell_type_list):
-    centrality_scores = input_file
-    for key in centrality_scores.keys():
-        if exclude_v17==True:
-            df = centrality_scores[key][~centrality_scores[key]['treatment_scheme'].str.contains('v1.7')]
-        else:
-            df = centrality_scores[key]
-
-        # Keep only patients with matched biopsy and resection samples
-        resection_pts = df[df['sample_type']=='Resection']['pt_id'].tolist()
-        biopsy_pts = df[df['sample_type']=='Biopsy']['pt_id'].tolist()
-        paired_pts = list(set(resection_pts) & set(biopsy_pts))
-        paired_pt_df = df[df['pt_id'].isin(paired_pts)]
-
-        category_map = paired_pt_df[[category, 'pt_id', ]].drop_duplicates() if category in ['MPR', 'treatment'] else paired_pt_df[['pt_id']].drop_duplicates()
-        pairs_df = paired_pt_df.groupby(['sample_type', 'pt_id'], observed=True).mean(numeric_only=True).reset_index()
-        
-        pairs_df = pairs_df.merge(category_map, on=['pt_id'], how='left')
-
-        biopsy_df = pairs_df[pairs_df['sample_type']=='Biopsy']
-        biopsy_fractions = biopsy_df[cell_type_list].set_index(biopsy_df['pt_id'])
-        resection_df = pairs_df[pairs_df['sample_type']=='Resection']
-        resection_fractions = resection_df[cell_type_list].set_index(resection_df['pt_id']).reindex(biopsy_fractions.index)
-
-        if category == None:
-            # Calculate log2 fold change (log2(resection / biopsy)), handling division by zero
-            fc_df = np.log2(resection_fractions.div(biopsy_fractions.replace(0, np.nan)))
-            fc_df = fc_df.replace([np.inf, -np.inf], np.nan)
-            
-            plt.figure(figsize=(12, 6))
-            sns.boxplot(data=fc_df)
-            if exclude_v17==False:
-                plt.title(f"Log2 Fold Change (Resection/Biopsy) for {key}")
-                file_name = f'{output_dir_plots}centrality_scores/{key}_foldchange_box_w_v1.7.svg'
-            elif exclude_v17==True:
-                plt.title(f"Log2 Fold Change (Resection/Biopsy) for {key} (excluding v1.7 treatment scheme)")
-                file_name = f'{output_dir_plots}centrality_scores/{key}_foldchange_box_wo_v1.7.svg'
-
-            plt.axhline(y=0, color='red', linestyle='--', linewidth=1, label='No change')
-            plt.xticks(rotation=45, ha='right')
-            plt.xlabel("Cell Type")
-            plt.ylabel(f"Log2 Fold Change in {key} (Resection/Biopsy)")
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(file_name, format='svg')
-            plt.close()
-
-        elif category != None:
-            # Calculate log2 fold change
-            fc_df = np.log2(resection_fractions.div(biopsy_fractions.replace(0, np.nan)))
-            fc_df = fc_df.replace([np.inf, -np.inf], np.nan)
-            fc_df[category] = fc_df.index.map(biopsy_df.set_index('pt_id')[category])
-            
-            fc_df_melted = pd.melt(fc_df, id_vars=[category], value_vars=cell_type_list, var_name='cell_type', value_name=key)
-
-            # ensure consistent (alphabetical) order of categories
-            cat_order = sorted(fc_df_melted[category].dropna().unique())
-            fc_df_melted[category] = pd.Categorical(fc_df_melted[category], categories=cat_order, ordered=True)
-
-            plt.figure(figsize=(12, 6))
-            ax = sns.boxplot(data=fc_df_melted, x="cell_type", y=key, hue=category, palette='tab20')
-        
-            stat_df, stat_df_annot = ind_stat_testing(fc_df, cell_type_list, stat_test, category)
-            if exclude_v17==False:
-                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_foldchange_{key}_statistical_results_w_v1.7.csv', index=False)
-                plt.title(f"Log2 Fold Change (Resection/Biopsy) for {key} ({stat_test.__name__})")
-                file_name = f'{output_dir_plots}centrality_scores/{key}_foldchange_box_{stat_test.__name__}_{category}_w_v1.7.svg'
-            elif exclude_v17==True:
-                stat_df.to_csv(f'{output_dir_results}/{stat_test.__name__}_foldchange_{key}_statistical_results_wo_v1.7.csv', index=False)
-                plt.title(f"Log2 Fold Change (Resection/Biopsy) for {key} (excluding v1.7 treatment scheme) ({stat_test.__name__})")
-                file_name = f'{output_dir_plots}centrality_scores/{key}_foldchange_box_{stat_test.__name__}_{category}_wo_v1.7.svg'
-        
-            # Generate pairs for significant comparisons only
-            alpha = 0.05
-            sig_df = stat_df_annot[stat_df_annot["pval"] < alpha].copy().reset_index(drop=True)
-            if sig_df.empty:
-                print(f"No significant results for category: {category} — skipping annotation.")
-            else:
-                pairs = [((row.variable, row.group1), (row.variable, row.group2)) for _, row in sig_df.iterrows()]
-                annot = Annotator(ax, pairs, data=fc_df_melted, x='cell_type', y=key, hue=category)
-                annot.configure(text_format="star")
-                annot.set_pvalues_and_annotate(sig_df['pval'])
-
-            plt.axhline(y=0, color='red', linestyle='--', linewidth=1, label='No change')
-            plt.xticks(rotation=45, ha='right')
-            plt.xlabel("Cell Type")
-            plt.ylabel(f"Log2 Fold Change in {key} (Resection/Biopsy)")
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(file_name, format='svg')
-            plt.close()
-
-
-
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# 2 Prepare data and run analysis
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Read in centrality scores file
-with open(centrality_scores_path, 'rb') as f:
-    centrality_scores = pickle.load(f)
-
-# Run analysis
-#------------------------------------------------------------------------------
-# specify categories to loop over based on whether v1.7 samples are included or not, since treatment scheme is only relevant if v1.7 samples are included
-if exclude_v17==True:
-    categories = [None, 'MPR']
-else:
-    categories = [None, 'MPR', 'treatment']
-
-
-# loop over different centrality measures
-for key in ['degree_centrality']:             #centrality_scores.keys():    
-    if exclude_v17==True:       # filter out v1.7 samples if exclude_v17 is True
-        centrality_scores_df = centrality_scores[key][~centrality_scores[key]['treatment_scheme'].str.contains('v1.7')]       
-    else:
-        centrality_scores_df = centrality_scores[key]
-    centrality_scores_df['sample_id'] = centrality_scores_df.index
-    centrality_scores_df['regression'] = centrality_scores_df['regression'].astype('category')
-
-    for group in ['sample_type', 'structure', 'structure_core']:
-        #print(f'Analyzing {group}')
-        if group == 'structure':
-            centrality_scores_df = centrality_scores_df[centrality_scores_df['sample_type']=='Resection']
-        for category in categories:
-            #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
-            if category != None:
-                #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
-            
-            if group == 'sample_type':
-                paired_df = centrality_scores_df.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
-                centrality_scores_df_paired = paired_df.groupby(['pt_id', 'sample_type'], observed=True).mean(numeric_only=True).reset_index()
-                if category is not None:
-                    metainfo_map = paired_df[['pt_id', category]].drop_duplicates()
-                else:
-                    metainfo_map = paired_df[['pt_id']].drop_duplicates()
-                pairs_df = centrality_scores_df_paired.merge(metainfo_map, on=['pt_id'], how='left')
-                print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
-                #stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list, key=key)
-                stat_analysis_centrality_scores_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
-
-
-
-
-
-
