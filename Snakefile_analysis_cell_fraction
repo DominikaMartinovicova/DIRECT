@@ -43,15 +43,17 @@ rule cell_fraction_analysis:
     #conda:
     #    xenium_py310
     params:
+        celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
+        phen_level = config[phenotyping_level]
         out_plot_dir = output_dir_plots + f"celltype_fraction_{ex_v17}/",
         out_results = output_dir_results + f"celltype_fraction_{ex_v17}/",
-        phen_level = phenotyping_level,
         exclude_flag = "--exclude_v17" if exclude_v17 else ""
 
     shell:
         """
         python3 scripts/analysis_and_plotting/cell_fraction_analysis.py \
 	    -i {input.combined_adatas} \
+        --celltype_list {params.celltype_list} \
         --phen_level {params.phen_level} \
         {params.exclude_flag} \
         -o {output.analyzed_adatas} \

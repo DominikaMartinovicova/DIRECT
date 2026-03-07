@@ -108,19 +108,14 @@ def stat_testing_two_groups(df, cell_cols, stat_test, group, groups):
 #------------------------------------------------------------------------------
 def stat_analysis_centrality_scores_box(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):
     # Common setup
-    groups = sorted(input_file[group].unique())
+    groups = sorted(input_file[group].dropna().unique())
     id_vars = ['sample_id',group, category] if category else ['sample_id',group]
     scores_df = input_file[id_vars + cell_type_list].copy()
     scores_df_melted = scores_df.melt(id_vars=id_vars, var_name='cell_type', value_name=key)
-    
-    # Determine plot parameters
-    if category != None:
-        col_order = ['>=90', '<90'] if category == "MPR" else sorted(input_file[category].unique())
-    else:
-        col_order = None
+
+    col_order=sorted(input_file[category].dropna().unique()) if category else None
     col = category if category else None
-    print('boxplot')
-    print(scores_df_melted)
+
     # Create plot
     g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='box', palette='tab20', height=6, aspect=1.5)
     
@@ -154,7 +149,7 @@ def stat_analysis_centrality_scores_box(input_file, output_dir_plots, output_dir
     
     # Set labels and title
     if category:
-        title = f"{key} in {groups[0]} vs {groups[1]} in {category}"
+        title = f"{key} in {groups[0]} vs {groups[1]} split on {category}"
         if exclude_v17:
             title += " (excluding v1.7 treatment scheme)"
         title += f" ({stat_test.__name__})"
@@ -163,12 +158,16 @@ def stat_analysis_centrality_scores_box(input_file, output_dir_plots, output_dir
         g.set_ylabels(f'{key} score')
         plt.suptitle(title, y=1.03)
     else:
-        plt.title(f"{key} in {groups[0]} vs {groups[1]} ({stat_test.__name__})")
+        title = f"{key} in {groups[0]} vs {groups[1]}"
+        if exclude_v17:
+            title += " (excluding v1.7 treatment scheme)"
+        title += f" ({stat_test.__name__})"
+        plt.title(title)
         plt.xticks(rotation=45, ha='right')
         plt.xlabel('Cell type')
         plt.ylabel(f'{key} score')
     
-    g.legend.set_title('Sample type')
+    g.legend.set_title(group)
     g.legend.set_loc('upper right')
     plt.tight_layout()
     plt.savefig(base_filename, format='svg', bbox_inches='tight')
@@ -178,19 +177,15 @@ def stat_analysis_centrality_scores_box(input_file, output_dir_plots, output_dir
 #-----------------------------------------------------------------------------
 def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):       
     # Common setup
-    groups = sorted(input_file[group].unique())
+    groups = sorted(input_file[group].dropna().unique())
     id_vars = ['pt_id',group, category] if category else ['pt_id',group]
     scores_df = input_file[id_vars + cell_type_list].copy()
     scores_df_melted = scores_df.melt(id_vars=id_vars, var_name='cell_type', value_name=key)
     
     # Determine plot parameters
-    if category != None:
-        col_order = ['>=90', '<90'] if category == "MPR" else sorted(input_file[category].unique())
-    else:
-        col_order = None
+    col_order=sorted(input_file[category].dropna().unique()) if category else None
     col = category if category else None
-    print('lineplot')
-    print(scores_df_melted)
+
     # Create plot
     g = sns.catplot(scores_df_melted, x='cell_type', y=key, hue=group, hue_order=groups, col=col, col_order=col_order, kind='strip',palette={groups[0]:'gray', groups[1]:'black'}, jitter=False, dodge = True, height=6, aspect=1.5, size=4)
 
@@ -198,7 +193,6 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
     axes = g.axes.flat if category else [g.ax]
     facet_data = list(g.facet_data()) if category else [(None, input_file)]
 
-    print(facet_data)
     for ax, (facet_key, subdata) in zip(axes, facet_data): 
         # ---- Connect paired samples with lines ----
         dodge_width = 0.4
@@ -242,7 +236,7 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
 
     # Set labels and title
     if category:
-        title = f"{key} in {groups[0]} vs {groups[1]} in {category}"
+        title = f"{key} in {groups[0]} vs {groups[1]} split on {category}"
         if exclude_v17:
             title += " (excluding v1.7 treatment scheme)"
         title += f" ({stat_test.__name__})"
@@ -251,43 +245,43 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
         g.set_ylabels(f'{key} score')
         plt.suptitle(title, y=1.03)
     else:
-        plt.title(f"{key} in {groups[0]} vs {groups[1]} ({stat_test.__name__})")
+        title = f"{key} in {groups[0]} vs {groups[1]}"
+        if exclude_v17:
+            title += " (excluding v1.7 treatment scheme)"
+        title += f" ({stat_test.__name__})"
+        plt.title(title)
         plt.xticks(rotation=45, ha='right')
         plt.xlabel('Cell type')
         plt.ylabel(f'{key} score')
     
-    g.legend.set_title('Sample type')
+    g.legend.set_title(group)
     g.legend.set_loc('upper right')
     plt.tight_layout()
     plt.savefig(base_filename, format='svg', bbox_inches='tight')
     plt.close()
 
 
-
-
 # Statistical analysis and plotting of fold change in centrality scores between biopsy and resection samples
 #------------------------------------------------------------------------------
 def stat_analysis_centrality_scores_foldchange_box(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):
-    groups = sorted(input_file[group].unique())
+    groups = sorted(input_file[group].dropna().unique())
     df_ref = input_file[input_file[group]==groups[0]].set_index(['pt_id'])[cell_type_list]
     df_target = input_file[input_file[group]==groups[1]].set_index(['pt_id']).reindex(df_ref.index)[cell_type_list]
-    print(input_file)
+
     # Calculate log2 fold change (log2(resection / biopsy)), handling division by zero
     fc_df = np.log2(df_target.div(df_ref.replace(0, np.nan)))
     fc_df = fc_df.replace([np.inf, -np.inf], np.nan)
-    print(fc_df)
+
     id_vars = ['pt_id', category] if category else ['pt_id']
     metainfo_map = input_file[id_vars].drop_duplicates()
     fc_df = fc_df.merge(metainfo_map, on=['pt_id'], how='left').set_index('pt_id')
-    print(fc_df)
 
     plt.figure(figsize=(12, 6))
     if category is None:
         ax = sns.boxplot(data=fc_df)
     else:
         fc_df_melt = pd.melt(fc_df,id_vars=[category], value_vars=cell_type_list, var_name="cell_type", value_name=key)
-        print(fc_df_melt)
-        ax = sns.boxplot(data=fc_df_melt, x="cell_type", y=key, hue=category, palette="tab20")
+        ax = sns.boxplot(data=fc_df_melt, x="cell_type", y=key, hue=category, hue_order=sorted(input_file[category].dropna().unique()), palette="tab20")
 
     if category and stat_test:
         stat_df, stat_df_annot = stat_testing_two_groups(fc_df, cell_type_list, stat_test, category, fc_df[category].unique())
@@ -307,7 +301,7 @@ def stat_analysis_centrality_scores_foldchange_box(input_file, output_dir_plots,
 
     # Set labels and title
     if category:
-        title = f"{key} in {groups[0]} vs {groups[1]} in {category}"
+        title = f"{key} in {groups[0]} vs {groups[1]} split on {category}"
         if exclude_v17:
             title += " (excluding v1.7 treatment scheme)"
         title += f" ({stat_test.__name__})"
@@ -315,7 +309,11 @@ def stat_analysis_centrality_scores_foldchange_box(input_file, output_dir_plots,
         ax.set_ylabel(f'Log2FC {key} score')
         plt.suptitle(title, y=1.03)
     else:
-        plt.title(f"{key} in {groups[0]} vs {groups[1]} ({stat_test.__name__})")
+        title = f"{key} in {groups[0]} vs {groups[1]}"
+        if exclude_v17:
+            title += " (excluding v1.7 treatment scheme)"
+        title += f" ({stat_test.__name__})"
+        plt.title(title)
         plt.xlabel('Cell type')
         plt.ylabel(f'Log2FC {key} score')
     
@@ -350,16 +348,13 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
     centrality_scores_df['sample_id'] = centrality_scores_df.index
     centrality_scores_df['regression'] = centrality_scores_df['regression'].astype('category')
 
-    for group in ['sample_type', 'structure', 'structure_core']:
-        #print(f'Analyzing {group}')
+    for group in [None, 'sample_type', 'structure', 'structure_core']:
+        # #print(f'Analyzing {group}')
         if group == 'structure':
             centrality_scores_df = centrality_scores_df[centrality_scores_df['sample_type']=='Resection']
-        for category in ['treatment']:#categories:
-            #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
-            #if category != None:
-                #stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
-                
-            if group == 'sample_type':
+        
+        if group == 'sample_type':
+            for category in categories:
                 paired_df = centrality_scores_df.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
                 centrality_scores_df_paired = paired_df.groupby(['pt_id', 'sample_type'], observed=True).mean(numeric_only=True).reset_index()
                 if category is not None:
@@ -368,9 +363,23 @@ for key in ['degree_centrality']:             #centrality_scores.keys():
                     metainfo_map = paired_df[['pt_id']].drop_duplicates()
                 pairs_df = centrality_scores_df_paired.merge(metainfo_map, on=['pt_id'], how='left')
                 print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
-                #stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list, key=key)
+                stat_analysis_centrality_scores_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=wilcoxon, cell_type_list=cell_type_list, key=key)
                 stat_analysis_centrality_scores_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
 
+        
+        if group != None:
+            for category in categories:
+                print('prva kombinacia')
+                print(group, category)
+                stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
+        
+        for category in categories:
+            if category != None:
+                print('druuha kombinacia')
+                print(group, category)
+                stat_analysis_centrality_scores_box(input_file=centrality_scores_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key=key)
+        
+ 
 
 
 
