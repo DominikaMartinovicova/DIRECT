@@ -5,7 +5,7 @@ all:
   output_dir_results: 'results/analysis/{phenotyping_level}/'
   output_dir_plots: 'plots/analysis/{phenotyping_level}/'
 
-exclude_v17: True
+exclude_v17: False
 
 phenotyping_level: 'Neutro_Epi_extImm_pooled_A_EM_N'
 
