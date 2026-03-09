@@ -30,8 +30,8 @@ print('Exclude v1.7 samples:', exclude_v17)
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
-        data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+        data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
+        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -39,7 +39,7 @@ rule cell_fraction_analysis:
     input:
         combined_adatas = adata_processed_path
     output:
-        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adata.h5ad" #!!!! changed the name of the output to only call the core_wise rule
+        analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad" #!!!! changed the name of the output to only call the core_wise rule
     #conda:
     #    xenium_py310
     params:
@@ -65,7 +65,7 @@ rule cell_fraction_analysis_core_wise:
     input:
         combined_adatas = adata_processed_path
     output:
-        analyzed_adatas = data_dir + "analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+        analyzed_adatas = data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
     #conda:
     #    xenium_py310
     params:
