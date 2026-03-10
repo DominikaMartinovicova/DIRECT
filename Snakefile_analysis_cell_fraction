@@ -30,8 +30,8 @@ print('Exclude v1.7 samples:', exclude_v17)
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
-        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
+        #data_dir + f"analyzed/{phenotyping_level}_analyzed_adata.h5ad",
+        data_dir + f"analyzed/{phenotyping_level}_analyzed_adatas.h5ad"
 
 
 #+++++++++++++++++++++++++++++++++++++++ 1 ANALYZE CELL FRACTIONS IN XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
@@ -43,11 +43,11 @@ rule cell_fraction_analysis:
     #conda:
     #    xenium_py310
     params:
-        celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
-        phen_level = phenotyping_level,
-        out_plot_dir = output_dir_plots + f"celltype_fraction_{ex_v17}/",
-        out_results = output_dir_results + f"celltype_fraction_{ex_v17}/",
-        exclude_flag = "--exclude_v17" if exclude_v17 else ""
+        celltype_list = lambda wc: data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
+        phen_level = lambda wc: phenotyping_level,
+        out_plot_dir = lambda wc: output_dir_plots + f"celltype_fraction_{ex_v17}/",
+        out_results = lambda wc: output_dir_results + f"celltype_fraction_{ex_v17}/",
+        exclude_flag = lambda wc: "--exclude_v17" if exclude_v17 else ""
 
     shell:
         """
@@ -69,11 +69,11 @@ rule cell_fraction_analysis_core_wise:
     #conda:
     #    xenium_py310
     params:
-        celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
-        out_plot_dir = output_dir_plots + f"celltype_fraction_{ex_v17}_core_wise/",
-        out_results = output_dir_results + f"celltype_fraction_{ex_v17}_core_wise/",
-        phen_level = phenotyping_level,
-        exclude_flag = "--exclude_v17" if exclude_v17 else ""
+        celltype_list = lambda wc: data_dir + f"/combined/{phenotyping_level}_celltype_list.txt",
+        phen_level = lambda wc: phenotyping_level,
+        out_plot_dir = lambda wc: output_dir_plots + f"celltype_fraction_{ex_v17}_core_wise/",
+        out_results = lambda wc: output_dir_results + f"celltype_fraction_{ex_v17}_core_wise/",
+        exclude_flag = lambda wc: "--exclude_v17" if exclude_v17 else ""
 
     shell:
         """

@@ -113,9 +113,41 @@ plt.tight_layout()
 plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}/spatial/patching/{patch_size}um_{overlap}um/{patch}_ripleys_L.png', bbox_inches='tight')
 
 
+# Plot cross Ripley's statistics for cells of interest
+type_i = 'B_cell'
+type_j = 'T_cell_regulatory'
+ripleys_L_path = os.path.join(input_dir, 'dict_ripleys_L.pkl')
+with open(os.path.join(ripleys_L_path, f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "rb") as f:
+    res = pickle.load(f)
 
 
+r = res["r"]
+observed = res["L_observed"]
+sims = res["L_simulations"]
+csr = res["csr_expectation"]
 
+# simulation envelope (5–95%)
+lower = np.percentile(sims, 5, axis=0)
+upper = np.percentile(sims, 95, axis=0)
+
+plt.figure(figsize=(6,5))
+
+# simulation envelope
+plt.fill_between(r, lower, upper, alpha=0.3, label="Permutation envelope (5–95%)")
+
+# observed L
+plt.plot(r, observed, linewidth=2, label="Observed L(r)")
+
+# CSR expectation
+plt.plot(r, csr, linestyle="--", label="CSR expectation")
+
+plt.xlabel("Radius (r)")
+plt.ylabel("L(r)")
+plt.title(f"Cross-type Ripley's L: {res['type_i']} vs {res['type_j']}")
+plt.legend()
+plt.tight_layout()
+
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_{type_i}_vs_{type_j}.png', bbox_inches='tight')
 
 
 

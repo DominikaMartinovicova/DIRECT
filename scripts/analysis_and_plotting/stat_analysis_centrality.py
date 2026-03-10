@@ -265,8 +265,8 @@ def stat_analysis_centrality_scores_line(input_file, output_dir_plots, output_di
 #------------------------------------------------------------------------------
 def stat_analysis_centrality_scores_foldchange_box(input_file, output_dir_plots, output_dir_results, group, category, exclude_v17, stat_test, cell_type_list, key):
     groups = sorted(input_file[group].dropna().unique())
-    df_ref = input_file[input_file[group]==groups[0]].set_index(['pt_id'])[cell_type_list]
-    df_target = input_file[input_file[group]==groups[1]].set_index(['pt_id']).reindex(df_ref.index)[cell_type_list]
+    df_ref = input_file[input_file[group]==groups[0]].set_index(['pt_id'])[cell_type_list] + 0.0001
+    df_target = input_file[input_file[group]==groups[1]].set_index(['pt_id']).reindex(df_ref.index)[cell_type_list] + 0.0001
 
     # Calculate log2 fold change (log2(resection / biopsy)), handling division by zero
     fc_df = np.log2(df_target.div(df_ref.replace(0, np.nan)))

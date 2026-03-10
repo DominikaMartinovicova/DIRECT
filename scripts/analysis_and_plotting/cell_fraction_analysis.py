@@ -293,13 +293,16 @@ def stat_analysis_cell_fraction_foldchange_box(input_file, output_dir_plots, out
     print(input_file)
     print('Number of T_numbers:', input_file.shape[0], 'patients:', input_file['pt_id'].nunique(), input_file['pt_id'].unique())
     groups = sorted([g for g in input_file[group].dropna().unique() if not str(g).isdigit()])
+    print(groups)
+    print(groups[0])
+    print(groups[1])
     df_ref = input_file[input_file[group]==groups[0]].set_index(['pt_id'])[cell_type_list] + 0.0001     # add a small constant to be able to calculate the fold change
     df_target = input_file[input_file[group]==groups[1]].set_index(['pt_id']).reindex(df_ref.index)[cell_type_list] + 0.0001
-    print('df_ref: ', df_ref)
-    print('df_target: ', df_target)
+    # print('df_ref: ', df_ref)
+    # print('df_target: ', df_target)
     # Calculate log2 fold change (log2(resection / biopsy)), handling division by zero
     fc_df = np.log2(df_target.div(df_ref.replace(0, np.nan)))
-    print('FC',fc_df)
+    #print('FC',fc_df)
     fc_df = fc_df.replace([np.inf, -np.inf], np.nan)
     id_vars = ['pt_id', category] if category else ['pt_id']
     metainfo_map = input_file[id_vars].drop_duplicates()
@@ -334,15 +337,15 @@ def stat_analysis_cell_fraction_foldchange_box(input_file, output_dir_plots, out
 
     # Set labels and title
     if category:
-        title = f"{key} {imm_suffix} in {groups[0]} vs {groups[1]} split on {category}"
+        title = f"{key} {imm_suffix} in {groups[1]} vs {groups[0]} split on {category}"
         if exclude_v17:
             title += " (excluding v1.7 treatment scheme)"
         title += f" ({stat_test.__name__})"
         ax.set_xlabel('Cell type')
-        ax.set_ylabel(f'Log2FC {key} ({group[1]}/{group[0]})')
+        ax.set_ylabel(f'Log2FC {key} ({groups[1]}/{groups[0]})')
         plt.suptitle(title, y=1.03)
     else:
-        title = f"{key} {imm_suffix} in {groups[0]} vs {groups[1]}"
+        title = f"{key} {imm_suffix} in {groups[1]} vs {groups[0]}"
         if exclude_v17:
             title += " (excluding v1.7 treatment scheme)"
         title += f" ({stat_test.__name__})"
@@ -414,49 +417,49 @@ for group in [None, 'sample_type']: #, 'structure']: #, 'structure_core']:
             print(f'Analyzing group {group} and {category}')
             pairs_df = fractions_df_final.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
             # print(pairs_df)
-            # print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
-            # stat_analysis_cell_fraction_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=wilcoxon, cell_type_list=cell_type_list, key='Cell fraction')
-            # stat_analysis_cell_fraction_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
-            # stat_analysis_cell_fraction_box(input_file=fractions_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
-            stat_analysis_cell_fraction_box(input_file=fractions_Btb_df, output_dir_plots='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/celltype_fraction_w_v1.7_Btb', output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
-    # for category in categories:
-    #     if category != None:
-    #         # print('druuha kombinacia')
-    #         print(category, group)
-    #         stat_analysis_cell_fraction_box(input_file=fractions_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
+            print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+            #stat_analysis_cell_fraction_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=wilcoxon, cell_type_list=cell_type_list, key='Cell fraction')
+            stat_analysis_cell_fraction_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
+            #stat_analysis_cell_fraction_box(input_file=fractions_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
+            #stat_analysis_cell_fraction_box(input_file=fractions_Btb_df, output_dir_plots='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/celltype_fraction_Btb/', output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
+    for category in categories:
+        if category != None:
+            # print('druuha kombinacia')
+            #print(category, group)
+            #stat_analysis_cell_fraction_box(input_file=fractions_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
     
  
 
-# # For immune component only
-# non_immune = ['Epithelial_cell', 'Fibroblast', 'Endothelial_cell', 'Pericyte', 'Stromal', 'Tumor_cells']
-# to_exclude = set(non_immune).intersection(fractions_df_final.columns)
-# print(f'Excluding non-immune cell types: {to_exclude}')
-# df_only_immune = fractions_df_final.drop(labels=to_exclude, axis=1)
-# df_only_immune_cells = df_only_immune[[col for col in df_only_immune.columns if col in celltype_list]]  # only keep columns that have ' fraction' in their name
-# df_immune_fractions = df_only_immune_cells.div(df_only_immune_cells.sum(axis=1), axis=0)  # Re-normalize to sum to 1
-# print(df_only_immune)
-# df_immune_fractions[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure', 'structure_core']] = df_only_immune[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure', 'structure_core']].values # Add metadata back
-# df_immune_fractions['T_number'] = df_immune_fractions.index
-# print(df_immune_fractions.head())
+# For immune component only
+non_immune = ['Epithelial_cell', 'Fibroblast', 'Endothelial_cell', 'Pericyte', 'Stromal', 'Tumor_cells']
+to_exclude = set(non_immune).intersection(fractions_df_final.columns)
+print(f'Excluding non-immune cell types: {to_exclude}')
+df_only_immune = fractions_df_final.drop(labels=to_exclude, axis=1)
+df_only_immune_cells = df_only_immune[[col for col in df_only_immune.columns if col in celltype_list]]  # only keep columns that have ' fraction' in their name
+df_immune_fractions = df_only_immune_cells.div(df_only_immune_cells.sum(axis=1), axis=0)  # Re-normalize to sum to 1
+print(df_only_immune)
+df_immune_fractions[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure', 'structure_core']] = df_only_immune[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure', 'structure_core']].values # Add metadata back
+df_immune_fractions['T_number'] = df_immune_fractions.index
+print(df_immune_fractions.head())
 
-# cell_type_list = [cell_type for cell_type in cell_type_list if cell_type not in to_exclude]
-# print(cell_type_list)
-# for group in [None, 'sample_type']: #, 'structure']: #, 'structure_core']:
-#     print(f'Analyzing {group}')
-#     if group == 'sample_type':
-#         for category in categories:
-#             print(df_immune_fractions)
-#             pairs_df = df_immune_fractions.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
-#             print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
-#             stat_analysis_cell_fraction_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=True, stat_test=wilcoxon, cell_type_list=cell_type_list, key='Cell fraction')
-#             stat_analysis_cell_fraction_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17,immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
-#             stat_analysis_cell_fraction_box(input_file=df_immune_fractions, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
+cell_type_list = [cell_type for cell_type in cell_type_list if cell_type not in to_exclude]
+print(cell_type_list)
+for group in [None, 'sample_type']: #, 'structure']: #, 'structure_core']:
+    print(f'Analyzing {group}')
+    if group == 'sample_type':
+        for category in categories:
+            print(df_immune_fractions)
+            pairs_df = df_immune_fractions.groupby('pt_id').filter(lambda x: x['sample_type'].nunique()==2)
+            print(f'Number of paired patients: {len(pairs_df["pt_id"].unique())}')
+            #stat_analysis_cell_fraction_line(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=True, stat_test=wilcoxon, cell_type_list=cell_type_list, key='Cell fraction')
+            stat_analysis_cell_fraction_foldchange_box(input_file=pairs_df, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17,immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
+            #stat_analysis_cell_fraction_box(input_file=df_immune_fractions, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=group, category=category, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
 
-#     for category in categories:
-#         if category != None:
-#             #print('druuha kombinacia')
-#             #print(group, category)
-#             stat_analysis_cell_fraction_box(input_file=df_immune_fractions, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
+    # for category in categories:
+    #     if category != None:
+            #print('druuha kombinacia')
+            #print(group, category)
+            #stat_analysis_cell_fraction_box(input_file=df_immune_fractions, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=group, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
  
 
 

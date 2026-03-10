@@ -247,7 +247,7 @@ if exclude_v17 == True:
 else:
     categories = [None, 'MPR', 'treatment']
 
-structure_columns = ['structure']#, 'structure_core']
+structure_columns = ['structure', 'structure_core']
 cores = res_df['structure_core'].unique()
 structure_types = res_df['structure'].unique()
 
@@ -255,63 +255,46 @@ structure_types = res_df['structure'].unique()
 #--------------------------------------------------------------------------------
 meta_df = res_df[meta_list].drop(['sample', 'T_number', 'structure_core', 'structure'], axis=1).drop_duplicates()
 
-# for structure_col in structure_columns:
-#     res_df_pooled = res_df.groupby(['pt_id', structure_col], as_index=False).mean(numeric_only = True)
-#     res_df_final = res_df_pooled.merge(meta_df, on='pt_id', how='left')
-#     #print(res_df_final)
-#     for category in categories:
-#         print(f'Analyzing structure_column and category: {structure_col} {category}')
-#         stat_analysis_cell_fraction_box(input_file=res_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=structure_col, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
-#         if category != None:
-#             print(f'Analyzing structure_column and category: {category} {structure_col}')
-#             stat_analysis_cell_fraction_box(input_file=res_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=structure_col, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
-
-
-
-# Calculate fractions per sample
+for structure_col in structure_columns:
+    res_df_pooled = res_df.groupby(['pt_id', structure_col], as_index=False).mean(numeric_only = True)
+    res_df_final = res_df_pooled.merge(meta_df, on='pt_id', how='left')
+    #print(res_df_final)
+    for category in categories:
+        print(f'Analyzing structure_column and category: {structure_col} {category}')
+        stat_analysis_cell_fraction_box(input_file=res_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=structure_col, category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
+        if category != None:
+            print(f'Analyzing structure_column and category: {category} {structure_col}')
+            stat_analysis_cell_fraction_box(input_file=res_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=structure_col, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
 
 
 
 
 
 
+# Focus on immune cell types only
+#--------------------------------------------------------------------------------
+non_immune = ['Epithelial_cell', 'Fibroblast', 'Endothelial_cell', 'Pericyte', 'Stromal', 'Tumor_cells']
+to_exclude = set(non_immune).intersection(res_df.columns)
+print(f'Excluding non-immune cell types: {to_exclude}')
+df_only_immune = res_df.drop(labels=to_exclude, axis=1)
 
+df_only_immune_cells = df_only_immune[[col for col in df_only_immune.columns if col in cell_type_list]]  # only keep columns that have ' fraction' in their name
+df_immune_fractions = df_only_immune_cells.div(df_only_immune_cells.sum(axis=1), axis=0)  # Re-normalize to sum to 1
+df_immune_fractions[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure','structure_core']] = df_only_immune[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure','structure_core']].values # Add metadata back
+df_immune_fractions['sample'] = df_immune_fractions.index
 
+res_df_immune = df_immune_fractions[df_immune_fractions['sample_type']=='Resection']
+print(f'Number of resection samples (immune only): {res_df_immune.shape[0]}')
 
-
-B_df = 
-tumorb_df = res_df[res_df[]]
-for category in categories:
-    stat_analysis_cell_fraction_box(input_file=B_tumorb_df_final, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group='sample_type', category=category, exclude_v17=exclude_v17, immune=False, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')
-
-
-
-
-
-# # Focus on immune cell types only
-# #--------------------------------------------------------------------------------
-# non_immune = ['Epithelial_cell', 'Fibroblast', 'Endothelial_cell', 'Pericyte', 'Stromal', 'Tumor_cells']
-# to_exclude = set(non_immune).intersection(res_df.columns)
-# print(f'Excluding non-immune cell types: {to_exclude}')
-# df_only_immune = res_df.drop(labels=to_exclude, axis=1)
-
-# df_only_immune_cells = df_only_immune[[col for col in df_only_immune.columns if col in cell_type_list]]  # only keep columns that have ' fraction' in their name
-# df_immune_fractions = df_only_immune_cells.div(df_only_immune_cells.sum(axis=1), axis=0)  # Re-normalize to sum to 1
-# df_immune_fractions[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure','structure_core']] = df_only_immune[['pt_id', 'sample_type', 'MPR', 'treatment', 'structure','structure_core']].values # Add metadata back
-# df_immune_fractions['sample'] = df_immune_fractions.index
-
-# res_df_immune = df_immune_fractions[df_immune_fractions['sample_type']=='Resection']
-# print(f'Number of resection samples (immune only): {res_df_immune.shape[0]}')
-
-# cell_type_list = [cell_type for cell_type in cell_type_list if cell_type not in to_exclude]
-# for structure_col in structure_columns:
-#     res_df_pooled_immune = res_df_immune.groupby(['pt_id', structure_col], as_index=False).mean(numeric_only = True)
-#     res_df_final_immune = res_df_pooled_immune.merge(meta_df, on='pt_id', how='left')    
-#     for category in categories:
-#         print(f'Analyzing category: {category}')
-#         stat_analysis_cell_fraction_box(input_file=res_df_final_immune, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=structure_col, category=category, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
-#         if category != None:
-#             stat_analysis_cell_fraction_box(input_file=res_df_final_immune, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=structure_col, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
+cell_type_list = [cell_type for cell_type in cell_type_list if cell_type not in to_exclude]
+for structure_col in structure_columns:
+    res_df_pooled_immune = res_df_immune.groupby(['pt_id', structure_col], as_index=False).mean(numeric_only = True)
+    res_df_final_immune = res_df_pooled_immune.merge(meta_df, on='pt_id', how='left')    
+    for category in categories:
+        print(f'Analyzing category: {category}')
+        stat_analysis_cell_fraction_box(input_file=res_df_final_immune, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=structure_col, category=category, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
+        if category != None:
+            stat_analysis_cell_fraction_box(input_file=res_df_final_immune, output_dir_plots=output_dir_plots, output_dir_results=output_dir_results, group=category, category=structure_col, exclude_v17=exclude_v17, immune=True, stat_test=mannwhitneyu, cell_type_list=cell_type_list, key='Cell fraction')            
 
 
 

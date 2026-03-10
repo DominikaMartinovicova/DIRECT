@@ -9,13 +9,8 @@
 #   0 Import libraries and parse arguments
 #   1 Read data
 #   2 Define analysis functions
-#   3 Create fractions dataframe
+
 #   4 Choose analyses to perform:
-#       a. Cell type fraction shifts (lineplot)
-#       b. Cell type fraction shifts (boxplots)
-#       c. Cell type fraction composition (boxplots)
-#       d. Cell type fraction composition within sample type (boxplots)
-#       * statistical testing functions - paired and independent samples
 #   5 Save
 #
 #
@@ -38,6 +33,7 @@ from numpy.random import default_rng
 import argparse
 import os
 import pickle
+import matplotlib.pyplot as plt
 
 # Parse arguments from commandline
 #--------------------------------------------------------------------------------
@@ -157,6 +153,40 @@ def _cross_L(coords_i, coords_j, radii, area):
 
     return L_ij
 
+
+# Plot Ripley's L curve with simulation envelope
+#--------------------------------------------------------------------------------
+def plot_cross_ripley(result, output_path=None):
+    r = result["r"]
+    observed = result["L_observed"]
+    sims = result["L_simulations"]
+    csr = result["csr_expectation"]
+
+    # simulation envelope (5–95%)
+    lower = np.percentile(sims, 5, axis=0)
+    upper = np.percentile(sims, 95, axis=0)
+
+    plt.figure(figsize=(6,5))
+
+    # simulation envelope
+    plt.fill_between(r, lower, upper, alpha=0.3, label="Permutation envelope (5–95%)")
+
+    # observed L
+    plt.plot(r, observed, linewidth=2, label="Observed L(r)")
+
+    # CSR expectation
+    plt.plot(r, csr, linestyle="--", label="CSR expectation")
+
+    plt.xlabel("Radius (r)")
+    plt.ylabel("L(r)")
+    plt.title(f"Cross-type Ripley's L: {result['type_i']} vs {result['type_j']}")
+    plt.legend()
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=300)
+        plt.close()
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -164,15 +194,13 @@ for type_i in coi_list:
     for type_j in coi_list:
         if type_i != type_j:
             print(f"Calculating cross-type Ripley's L for {type_i} vs {type_j}...")
-            res = cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_steps=50, max_dist=None, n_simulations=10, seed=42, copy=True)
+            res = cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_steps=50, max_dist=600, n_simulations=500, seed=42, copy=True)
             # Save results for this pair of types
-            with open(os.path.join(output_dir_results, f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "wb") as f:
+            with open(os.path.join(output_dir_results, 'cross_ripley', f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "wb") as f:
                 pickle.dump(res, f)
             # save the results as csv file
-            res_df = pd.DataFrame({
-                "r": res["r"],
-                "L_observed": res["L_observed"],
-                "pvalues": res["pvalues"]
-            })
-            res_df.to_csv(os.path.join(output_dir_results, f"cross_ripley_{type_i}_vs_{type_j}.csv"), index=False)
+            res_df = pd.DataFrame({"r": res["r"], "L_observed": res["L_observed"],"pvalues": res["pvalues"]})
+            res_df.to_csv(os.path.join(output_dir_results, 'cross_ripley', f"cross_ripley_{type_i}_vs_{type_j}.csv"), index=False)
+            # Save plot
+            #plot_cross_ripley(res,os.path.join(output_dir_results,f"cross_ripley_{type_i}_vs_{type_j}.png"))
 

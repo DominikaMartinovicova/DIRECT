@@ -51,7 +51,8 @@ rule all:
     input:
         #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
         #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
-        output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+        #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
+        output_dir_results + f'spatial/per_sample/T23_004535_110005_1.csv'
 
 
 
@@ -75,51 +76,52 @@ checkpoint core_level_adata:
 #+++++++++++++++++++++++++++++++++++++++ 3 SPATIALLY ANALYZE XENIUM DATA ++++++++++++++++++++++++++++++++++++++++++++
 # Spatial analysis per core or tissue piece
 #-------------------------------------------------------------------------------------------------------------------
-rule spatial_analysis_per_core:
-    input:
-        adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
-    output:
-        output_plot_dir = directory(output_dir_results + f'spatial/per_sample/{{core}}/'),
-        centrality_scores = output_dir_results + f'spatial/per_sample/{{core}}/centrality_scores.csv',
-        nhood_enrichment = output_dir_results + f"spatial/per_sample/{{core}}/neighbors_enrichment.pkl",
-        interaction_matrix = output_dir_results + f"spatial/per_sample/{{core}}/interaction_matrix.pkl",
-        co_occurrence = output_dir_results + f"spatial/per_sample/{{core}}/co_occurrence_probabilities.pkl",
-        ripleys_L = output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl'
-    params:
-        celltype_key = phenotyping_level,
-        celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt"
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/spatial_analysis.py \
-        -i {input.adata_core_subset} \
-        --celltype_key {params.celltype_key} \
-        --celltype_list {params.celltype_list} \
-        -o_results {output_dir_results}/spatial/per_sample/{wildcards.core}/ \
-        -o_plots {output_dir_plots}/spatial/per_sample/{wildcards.core}/ \
-        """
-
-# # Perform Ripley's L function analysis per core or tissue piece
-# #-------------------------------------------------------------------------------------------------------------------
-# rule cross_ripleys_per_core:
+# rule spatial_analysis_per_core:
 #     input:
 #         adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
 #     output:
-#         ripleys_L = output_dir_results + 
+#         output_plot_dir = directory(output_dir_results + f'spatial/per_sample/{{core}}/'),
+#         centrality_scores = output_dir_results + f'spatial/per_sample/{{core}}/centrality_scores.csv',
+#         nhood_enrichment = output_dir_results + f"spatial/per_sample/{{core}}/neighbors_enrichment.pkl",
+#         interaction_matrix = output_dir_results + f"spatial/per_sample/{{core}}/interaction_matrix.pkl",
+#         co_occurrence = output_dir_results + f"spatial/per_sample/{{core}}/co_occurrence_probabilities.pkl",
+#         ripleys_L = output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl'
 #     params:
 #         celltype_key = phenotyping_level,
-#         coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
+#         celltype_list = data_dir + f"/combined/{phenotyping_level}_celltype_list.txt"
 #     #conda:
 #     #    "xenium_py310"
 #     shell:
 #         """
-#         python3 scripts/analysis_and_plotting/cross_type_ripleys.py \
+#         python3 scripts/analysis_and_plotting/spatial_analysis.py \
 #         -i {input.adata_core_subset} \
-#         --phen_level {params.celltype_key} \
-#         --coi {params.coi} \
-#         -o {output_dir_results}/spatial/per_sample/{wildcards.core}/ \
-#         """
+#         --celltype_key {params.celltype_key} \
+#         --celltype_list {params.celltype_list} \
+#         -o_results {output_dir_results}/spatial/per_sample/{wildcards.core}/ \
+#         -o_plots {output_dir_plots}/spatial/per_sample/{wildcards.core}/ \
+#        """
+
+# Perform Ripley's L function analysis per core or tissue piece
+#-------------------------------------------------------------------------------------------------------------------
+rule cross_ripleys_per_core:
+    input:
+        adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
+    output:
+        ripleys_L = output_dir_results + f'spatial/per_sample/{{core}}.csv'
+    params:
+        output_dir_ripleys = output_dir_results + f"spatial/per_sample/{{core}}/ripleys"
+        celltype_key = phenotyping_level,
+        coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/cross_type_ripleys.py \
+        -i {input.adata_core_subset} \
+        --phen_level {params.celltype_key} \
+        --coi {params.coi} \
+        -o {params.output_dir_ripleys} \
+        """
 
 # Combine spatial analysis results 
 #-------------------------------------------------------------------------------------------------------------------
