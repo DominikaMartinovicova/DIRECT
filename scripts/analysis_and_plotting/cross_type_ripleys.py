@@ -170,6 +170,8 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
     rng = default_rng(seed)
     sims = np.zeros((n_simulations, len(radii)))
 
+    failed_density = 0
+    valid_simulations = 0
     for s in range(n_simulations):
         permuted = rng.permutation(labels)
         # Get coordinates for the permuted cell types
@@ -177,10 +179,17 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
         coords_j_perm = coordinates[permuted == type_j]
         # If a permutation results in one of the types having no cells, skip this permutation
         if len(coords_i_perm) == 0 or len(coords_j_perm) == 0:  
+            failed_density += 1
             continue
         # Calculate L for the permuted data
         sims[s] = _cross_L(coords_i_perm, coords_j_perm, radii, window_polygon)
+        valid_simulations += 1
+    
+    sd_sim = np.std(sims, axis=0)
 
+    failed_sd = False
+    if np.any(sd_sim == 0) or np.any(np.isnan(sd_sim)):
+        failed_sd = True
     # two-sided Monte Carlo p-values
     pvals = (np.sum(sims >= observed_L, axis=0) + 1) / (n_simulations + 1)
     pvals = np.minimum(pvals, 1 - pvals)
@@ -195,9 +204,15 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
         "csr_expectation": radii,
         "type_i": type_i,
         "type_j": type_j,
+        "n_source_cells": n_i,
+        "n_target_cells": n_j,
         "integral_signed": integral_signed,
-        "integral_abs": integral_abs
-    }
+        "integral_abs": integral_abs,
+        "reason": None,
+        "failed_density_simulations": failed_density,
+        "valid_simulations": valid_simulations,
+        "failed_sd": failed_sd
+        }
 
     if copy:
         return result
@@ -205,15 +220,34 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
     key = f"cross_ripley_{type_i}_{type_j}"
     adata.uns[key] = result
 
+# Create empty results dictionary to ensure consistent output for each sample and pair of celltypes
+#------------------------------------------------------------------------------
+def empty_ripley_result(type_i, type_j, n_steps, reason):
+    radii = np.full(n_steps, np.nan)
 
-
-
+    result = {
+        "r": radii,
+        "L_observed": np.full(n_steps, np.nan),
+        "L_simulations": np.full((0, n_steps), np.nan),
+        "pvalues": np.full(n_steps, np.nan),
+        "csr_expectation": radii,
+        "type_i": type_i,
+        "type_j": type_j,
+        "n_source_cells": n_i,
+        "n_target_cells": n_j,
+        "integral_signed": np.nan,
+        "integral_abs": np.nan,
+        "reason": reason,
+        "failed_density_simulations": np.nan,
+        "valid_simulations": np.nan,
+        "failed_sd": np.nan}
+    return result
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Choose analyses to perform
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 cell_counts = adata.obs[cluster_key].value_counts()
-
+n_steps = 30
 
 dict_res = defaultdict(dict)
 for type_i, type_j in product(coi_list,coi_list):
@@ -224,20 +258,17 @@ for type_i, type_j in product(coi_list,coi_list):
     n_j = cell_counts.get(type_j, 0)
 
     if n_i <= min_i_threshold:
-        dict_res[type_i][type_j] = {"reason": "limited_source_cell"}
+        dict_res[type_i][type_j] = empty_ripley_result(type_i, type_j, n_steps, 'limited_source_cell')
         continue
 
     if n_j < min_j_threshold:
-        dict_res[type_i][type_j] = {"reason": "limited_target_cell"}
+        dict_res[type_i][type_j] = empty_ripley_result(type_i, type_j, n_steps, 'limited_target_cell')
         continue
 
     print(f"Calculating cross-type Ripley's L for {type_i} vs {type_j}...")
     
-    res = cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_steps=30, max_dist=300, n_simulations=500, seed=42, copy=True)
+    res = cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_steps=n_steps, max_dist=300, n_simulations=500, seed=42, copy=True)
     dict_res[type_i][type_j] = res
-
-#print(dict_res)
-
 
 # Save results as dictionary
 with open(os.path.join(output_dir_results, f"dict_ripleys_L.pkl"), "wb") as f:
@@ -245,6 +276,11 @@ with open(os.path.join(output_dir_results, f"dict_ripleys_L.pkl"), "wb") as f:
 
 #with open(os.path.join(output_dir_results, 'cross_ripley', f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "wb") as f:
 #    pickle.dump(res, f)
+
+
+
+
+
 
 
 
