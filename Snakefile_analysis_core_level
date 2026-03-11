@@ -20,6 +20,7 @@ def combine_inputs(wildcards):
     files += expand(output_dir_results + "spatial/per_sample/{core}/neighbors_enrichment.pkl",core=cores)
     files += expand(output_dir_results + "spatial/per_sample/{core}/interaction_matrix.pkl",core=cores)
     files += expand(output_dir_results + "spatial/per_sample/{core}/co_occurrence_probabilities.pkl",core=cores)
+    files += expand(output_dir_results + "spatial/per_sample/{core}/dict_ripleys_L.pkl",core=cores)
     return files
 
 # def ripleys_L_core(wildcards):
@@ -52,8 +53,9 @@ rule all:
         #output_dir_results + 'spatial/combined/core_level/combined_centrality_scores.pkl'
         #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
         #output_dir_results + f'spatial/combined/core_level/statistical_analysis_results.pkl'
-        output_dir_results + f'spatial/per_sample/T23_004535_110005_1.csv'
-
+        #expand(output_dir_results + 'spatial/per_sample/{core}.csv', core = get_cores)
+        #output_dir_results + 'spatial/per_sample/T23_004535_110005_1.csv'
+        combined_ripleys_L = output_dir_results + f'spatial/combined/core_level/combined_ripleys_L.pkl'
 
 
 ####################################################################################################################
@@ -107,9 +109,9 @@ rule cross_ripleys_per_core:
     input:
         adata_core_subset = data_dir + f'adata_per_sample/{phenotyping_level}/{{core}}.h5ad'
     output:
-        ripleys_L = output_dir_results + f'spatial/per_sample/{{core}}.csv'
+        ripleys_L = output_dir_results + f'spatial/per_sample/{{core}}/dict_ripleys_L.pkl'
     params:
-        output_dir_ripleys = output_dir_results + f"spatial/per_sample/{{core}}/ripleys"
+        output_dir_ripleys = output_dir_results + f"spatial/per_sample/{{core}}",
         celltype_key = phenotyping_level,
         coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
     #conda:
@@ -133,7 +135,8 @@ rule combine_core_spatial_analysis_results:
         combined_nhood_enrichment = output_dir_results + "spatial/combined/core_level/combined_neighbors_enrichment.pkl",
         combined_interaction_matrix = output_dir_results + "spatial/combined/core_level/combined_interaction_matrix.pkl",
         combined_co_occurrence = output_dir_results + "spatial/combined/core_level/combined_cooccurrence_probabilities.pkl",
-        #combined_ripleys_L = output_dir_results + f'spatial/combined/core_level/combined_ripleys_L.pkl'
+        combined_ripleys_L = output_dir_results + f'spatial/combined/core_level/combined_ripleys_L.pkl',
+        #combined_ripley_L = output_dir_results + f'spatial/combined/core_level/combined_ripley_L.pkl'
     params:
         adata_path = data_dir + f"/combined/{phenotyping_level}_combined_adatas_for_analysis_w_v1.7.h5ad",
         in_dir = output_dir_results + 'spatial/per_sample/',

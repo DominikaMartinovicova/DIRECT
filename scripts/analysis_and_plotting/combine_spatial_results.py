@@ -83,6 +83,7 @@ centrality_results={}
 nhood_results={}
 interaction_results={}
 cooccurrence_results={}
+ripleys_results={}
 for i, sample_dir in enumerate(list_dir):   # Loop over all folders and files in the directory
     sample = sample_dir.split("/")[-2]
     #print(f"Reading results from {sample}")
@@ -102,6 +103,10 @@ for i, sample_dir in enumerate(list_dir):   # Loop over all folders and files in
             with open(os.path.join(sample_dir, file), 'rb') as f:
                 file = pickle.load(f)
             cooccurrence_results[sample] = file
+        elif file.endswith("dict_ripleys_L.pkl"):
+            with open(os.path.join(sample_dir, file), 'rb') as f:
+                file = pickle.load(f)
+            ripleys_results[sample] = file
         #else:
             #print(f"Skipping over {file}")
 
@@ -109,7 +114,7 @@ print("Centrality scores - " + str(len(centrality_results)))
 print("Neighborhood enrichment - " + str(len(nhood_results)))
 print("Interaction matrix - " + str(len(interaction_results)))
 print("Cooccurrence probabilities - " + str(len(cooccurrence_results)))
-
+print("Ripleys L - " + str(len(ripleys_results)))
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Combine results
@@ -164,14 +169,6 @@ with open(os.path.join(output_dir_results, 'combined_neighbors_enrichment.pkl'),
 #--------------------------------------------------------------------------------
 print('Combining interaction matrices...')
 combined_interaction_matrices = {}
-# for core in interaction_results.keys():
-#     combined_interaction_matrices[core] = {'matrix': interaction_results[core],
-#                                              'sample_type': core_info.loc[core, 'sample_type'],
-#                                              'MPR': core_info.loc[core, 'MPR'],
-#                                              'pt_id': core_info.loc[core, 'pt_id'],
-#                                              'treatment_scheme': core_info.loc[core, 'treatment_scheme'],
-#                                              'treatment': core_info.loc[core, 'treatment'],
-#                                              'structure': core_info.loc[core, 'structure']}
 
 for sample in interaction_results.keys():
     combined_interaction_matrices[sample] = {'matrix': interaction_results[sample]}
@@ -194,6 +191,30 @@ for sample in cooccurrence_results.keys():
 #print(combined_cooccurrence_probs)
 with open(os.path.join(output_dir_results, 'combined_cooccurrence_probabilities.pkl'), 'wb') as f:
     pickle.dump(combined_cooccurrence_probs, f)
+
+
+# Combine cross type Ripley's L statistics
+#--------------------------------------------------------------------------------
+print('Combining Ripley\'s L...')
+combined_ripleys_L={}
+for sample in ripleys_results.keys():
+    combined_ripleys_L[sample] = ripleys_results[sample]
+    for info in meta_info.columns:
+        combined_ripleys_L[sample][info] = meta_info.loc[sample, info]
+
+#print(combined_cooccurrence_probs)
+with open(os.path.join(output_dir_results, 'combined_ripleys_L.pkl'), 'wb') as f:
+    pickle.dump(combined_ripleys_L, f)
+
+
+
+
+
+
+
+
+
+
 
 print('Done combining results!')
 

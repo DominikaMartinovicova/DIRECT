@@ -36,7 +36,6 @@ import pickle
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from itertools import combinations, product
-from shapely.geometry import Polygon, Point
 
 # Parse arguments from commandline
 #--------------------------------------------------------------------------------
@@ -67,95 +66,37 @@ output_dir_results = args.output_dir_results
 coi_list = args.coi
 print(f"Cell types of interest: {coi_list}")
 
+min_i_threshold = 3
+min_j_threshold = 3
+
 # Make sure output directories exist
 os.makedirs(output_dir_results, exist_ok=True)
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# 1 Set variables to be used throughout calculation
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# minimum number of cells in source and target to continue with ripley's stat calculation 
-min_i_threshold = 3
-min_j_threshold = 3
-
-coordinates = np.asarray(adata.obsm["spatial"])     # get coordinates of all the points (cells) in the sample
-hull = ConvexHull(coordinates)      # identify cells that form the perimeter
-window_polygon = Polygon(coordinates[hull.vertices])       # create a polygon connecting the outermost points to create a convex shape
-area = window_polygon.area      # calculate area of the polygon
-
-
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Define analysis functions
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Calculate the distance to the hull edges
-#--------------------------------------------------------------------------------
-def distance_to_hull(coords, polygon):
-    return np.array([polygon.boundary.distance(Point(p)) for p in coords])
-
-# Calculate cross-type Ripley's L function with convex hull edge correction
-#--------------------------------------------------------------------------------
-def _cross_L(coords_i, coords_j, radii, polygon):
-    # get the number of source and target cells
-    n_i = coords_i.shape[0]
-    n_j = coords_j.shape[0]
-
-    area = polygon.area
-    tree = cKDTree(coords_j)
-    max_r = radii[-1]
-    neighbors = tree.query_ball_point(coords_i, max_r)  # find neighbors within the maximum radius from source cell
-
-    # compute distances to all target cells within the max radius for each source cell
-    distances = [
-        np.linalg.norm(coords_j[idx] - coords_i[i], axis=1)
-        if len(idx) > 0 else np.array([])
-        for i, idx in enumerate(neighbors)]
-
-    # distance to hull edge
-    d_edge = distance_to_hull(coords_i, polygon)
-    counts = np.zeros(len(radii))
-
-    for k, r in enumerate(radii):
-        total = 0   # store the number of target cells
-        for i, dists in enumerate(distances):
-            if len(dists) == 0:
-                continue
-            n_neighbors = np.sum(dists <= r)
-            if n_neighbors == 0:
-                continue
-            # isotropic edge correction approximation
-            if d_edge[i] >= r:  # if distance to edge larger than radius do not adjust the counts
-                weight = 1.0
-            else:   # if distance to edge smaller than radius that means the cell close to border, necessary to adjust for missing tissue beyonf the border
-                weight = r / max(d_edge[i], 1e-6)   # 1e-6 to prevent division by too small numbers
-                weight = min(weight, 5)     # limit the weight, if cell very close to the border than the weight might become very high adding noise
-            total += n_neighbors * weight   # adjust total counts by their respective weights
-        counts[k] = total   # for each radius save the weighted counts of target cells
-
-    lambda_j = n_j / area   # calculate density for normalization
-    K_ij = counts / (n_i * lambda_j)    # calculate Ripley's K
-    L_ij = np.sqrt(K_ij / np.pi)    # calculate Ripley's L; possibly subtract radii to get the 0 as the baseline
-    return L_ij
-
-# Calculate integral difference between simulated L and observed L
-#--------------------------------------------------------------------------------
-def integral_obs_sim(radii, observed_L, sims):
-    sim_mean = np.mean(sims, axis=0)    # get the mean value of all the simulations performed
-    diff = observed_L - sim_mean    # get the difference between these two lines
-    integral_value = np.trapz(diff,radii)   # integrate (calculate the area)
-    integral_abs = np.trapz(abs(diff), radii)   # get the magnitude
-    return integral_value, integral_abs
-
-
 # Calculate cross-type Ripley's L function and perform permutation testing
 #--------------------------------------------------------------------------------
 def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_steps=50, max_dist=None, n_simulations=100, seed=None, copy=False):
+    # Check if spatial coordinates and cluster labels are present
+    if spatial_key not in adata.obsm:
+        raise ValueError(f"{spatial_key} not found in adata.obsm")
+    if cluster_key not in adata.obs:
+        raise ValueError(f"{cluster_key} not found in adata.obs")
     # Extract coordinates and labels into arrays
     coordinates = np.asarray(adata.obsm[spatial_key])
     labels = np.asarray(adata.obs[cluster_key])
-
     # Select coordinates for the two cell types
     coords_i = coordinates[labels == type_i]
     coords_j = coordinates[labels == type_j]
+
+    if len(coords_i) == 0 or len(coords_j) == 0:
+        raise ValueError("Selected types contain no cells.")
+
+    # Calculate area of the convex hull of all points to use for intensity estimation
+    hull = ConvexHull(coordinates)
+    area = hull.volume
 
     if max_dist is None:
         max_dist = np.sqrt(area / 2)
@@ -164,7 +105,7 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
     radii = np.linspace(0, max_dist, n_steps)
 
     # Calculate observed cross-type L statistic
-    observed_L = _cross_L(coords_i, coords_j, radii, window_polygon)
+    observed_L = _cross_L(coords_i, coords_j, radii, area)
 
     # Perform permutation testing - randomly shuffle labels and recalculate L for each permutation
     rng = default_rng(seed)
@@ -179,13 +120,11 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
         if len(coords_i_perm) == 0 or len(coords_j_perm) == 0:  
             continue
         # Calculate L for the permuted data
-        sims[s] = _cross_L(coords_i_perm, coords_j_perm, radii, window_polygon)
+        sims[s] = _cross_L(coords_i_perm, coords_j_perm, radii, area)
 
     # two-sided Monte Carlo p-values
     pvals = (np.sum(sims >= observed_L, axis=0) + 1) / (n_simulations + 1)
     pvals = np.minimum(pvals, 1 - pvals)
-
-    integral_signed, integral_abs = integral_obs_sim(radii, observed_L, sims)
 
     result = {
         "r": radii,
@@ -195,8 +134,6 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
         "csr_expectation": radii,
         "type_i": type_i,
         "type_j": type_j,
-        "integral_signed": integral_signed,
-        "integral_abs": integral_abs
     }
 
     if copy:
@@ -205,9 +142,81 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
     key = f"cross_ripley_{type_i}_{type_j}"
     adata.uns[key] = result
 
+# Calculate cross-type Ripley's L function
+#--------------------------------------------------------------------------------
+def _cross_L(coords_i, coords_j, radii, area, window_coords):
+    n_i = coords_i.shape[0]
+    n_j = coords_j.shape[0]
+    max_r = radii[-1]
+    tree_j = cKDTree(coords_j)
 
+    # query once at maximum radius
+    neighbors = tree_j.query_ball_point(coords_i, max_r)
+    # compute distances only once
+    distances = [np.linalg.norm(coords_j[idx] - coords_i[i], axis=1)
+        if len(idx) > 0 else np.array([])
+        for i, idx in enumerate(neighbors)]
 
+    # bounding box for edge correction
+    xmin, ymin = coords_i.min(axis=0)
+    xmax, ymax = coords_i.max(axis=0)
 
+    dx = np.minimum(coords_i[:,0] - xmin, xmax - coords_i[:,0])
+    dy = np.minimum(coords_i[:,1] - ymin, ymax - coords_i[:,1])
+    d_edge = np.minimum(dx, dy)
+
+    counts = np.zeros(len(radii))
+
+    for k, r in enumerate(radii):
+        total = 0
+        for i, dists in enumerate(distances):
+            if len(dists) == 0:
+                continue
+            # neighbors within radius
+            n_neighbors = np.sum(dists <= r)
+            if n_neighbors == 0:
+                continue
+            # circumference edge correction
+            if d_edge[i] >= r:
+                weight = 1.0
+            else:
+                # isotropic correction
+                weight = r / max(d_edge[i], 1e-9)
+            total += n_neighbors * weight
+        counts[k] = total
+
+    lambda_j = n_j / area
+    K_ij = counts / (n_i * lambda_j)
+    L_ij = np.sqrt(K_ij / np.pi)
+
+    return L_ij
+
+# Calculate distance of each cell to the nearest border edge
+#--------------------------------------------------------------------------------
+#def distance_to_border(coords):
+#    xmin, ymin = coords.min(axis=0)
+#    xmax, ymax = coords.max(axis=0)
+#
+#    dx = np.minimum(coords[:,0] - xmin, xmax - coords[:,0])
+#    dy = np.minimum(coords[:,1] - ymin, ymax - coords[:,1])
+#
+#    return np.minimum(dx, dy)
+
+# Calculate cross-type Ripley's L function
+#--------------------------------------------------------------------------------
+#def _cross_L(coords_i, coords_j, radii, area):
+#    # Calculate pairwise distances between points of type i and type j
+#    n_i = coords_i.shape[0]
+#    n_j = coords_j.shape[0]
+#    distances = cdist(coords_i, coords_j)
+#    # For each radius, count the number of pairs (i,j) with distance <= r
+#    counts = np.array([np.sum(distances <= r) for r in radii])
+#    # Calculate K_ij and convert to L_ij
+#    lambda_j = n_j / area
+#    K_ij = counts / (n_i * lambda_j)
+#    L_ij = np.sqrt(K_ij / np.pi)
+#
+#    return L_ij
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2 Choose analyses to perform
@@ -245,35 +254,3 @@ with open(os.path.join(output_dir_results, f"dict_ripleys_L.pkl"), "wb") as f:
 
 #with open(os.path.join(output_dir_results, 'cross_ripley', f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "wb") as f:
 #    pickle.dump(res, f)
-
-
-
-
-
-
-# Calculate distance of each cell to the nearest border edge
-#--------------------------------------------------------------------------------
-#def distance_to_border(coords):
-#    xmin, ymin = coords.min(axis=0)
-#    xmax, ymax = coords.max(axis=0)
-#
-#    dx = np.minimum(coords[:,0] - xmin, xmax - coords[:,0])
-#    dy = np.minimum(coords[:,1] - ymin, ymax - coords[:,1])
-#
-#    return np.minimum(dx, dy)
-
-# Calculate cross-type Ripley's L function
-#--------------------------------------------------------------------------------
-#def _cross_L(coords_i, coords_j, radii, area):
-#    # Calculate pairwise distances between points of type i and type j
-#    n_i = coords_i.shape[0]
-#    n_j = coords_j.shape[0]
-#    distances = cdist(coords_i, coords_j)
-#    # For each radius, count the number of pairs (i,j) with distance <= r
-#    counts = np.array([np.sum(distances <= r) for r in radii])
-#    # Calculate K_ij and convert to L_ij
-#    lambda_j = n_j / area
-#    K_ij = counts / (n_i * lambda_j)
-#    L_ij = np.sqrt(K_ij / np.pi)
-#
-#    return L_ij
