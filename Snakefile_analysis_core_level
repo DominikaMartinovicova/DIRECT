@@ -113,7 +113,8 @@ rule cross_ripleys_per_core:
     params:
         output_dir_ripleys = output_dir_results + f"spatial/per_sample/{{core}}",
         celltype_key = phenotyping_level,
-        coi =  ["B_cell", "T_cell_regulatory", "Stromal"]
+        coi =  ["B_cell", "Macrophage", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"],
+        output_dir_plots = output_dir_plots + f'spatial/per_sample/{{core}}'
     #conda:
     #    "xenium_py310"
     shell:
@@ -123,6 +124,7 @@ rule cross_ripleys_per_core:
         --phen_level {params.celltype_key} \
         --coi {params.coi} \
         -o {params.output_dir_ripleys} \
+        --output_plots {params.output_dir_plots}
         """
 
 # Combine spatial analysis results 

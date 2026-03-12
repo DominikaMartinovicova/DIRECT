@@ -28,7 +28,7 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 from scipy.spatial import ConvexHull, cKDTree
-from scipy.spatial.distance import cdist
+import seaborn as sns
 from numpy.random import default_rng
 import argparse
 import os
@@ -56,6 +56,9 @@ def parse_args():
     parser.add_argument('-o', '--output_results', help='path to output dir with patches per sample',
                         dest='output_dir_results',
                         type=str)
+    parser.add_argument('--output_plots', help='path to output dir with patches per sample',
+                        dest='output_dir_plots',
+                        type=str)
     args = parser.parse_args()
     return args
 
@@ -69,7 +72,7 @@ print(f"Cell types of interest: {coi_list}")
 
 # Make sure output directories exist
 os.makedirs(output_dir_results, exist_ok=True)
-
+os.makedirs(args.output_dir_plots, exist_ok=True)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 1 Set variables to be used throughout calculation
@@ -270,9 +273,58 @@ for type_i, type_j in product(coi_list,coi_list):
     res = cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_steps=n_steps, max_dist=300, n_simulations=500, seed=42, copy=True)
     dict_res[type_i][type_j] = res
 
+# Join the integrals into a matrix
+#----------------------------------------------------------------------------
+celltypes = coi_list
+
+# initialize DataFrames with NaNs
+signed_integral_df = pd.DataFrame(np.nan, index=celltypes, columns=celltypes)
+absolute_integral_df = pd.DataFrame(np.nan, index=celltypes, columns=celltypes)
+
+for type_i in celltypes:
+    for type_j in celltypes:
+        if type_i == type_j:
+            continue
+        res = dict_res.get(type_i, {}).get(type_j, None)
+        if res is None:
+            continue
+        signed_integral_df.at[type_i, type_j] = res.get("integral_signed", np.nan)
+        absolute_integral_df.at[type_i, type_j] = res.get("integral_abs", np.nan)
+
+dict_res["signed_integral_matrix"] = signed_integral_df
+dict_res["absolute_integral_matrix"] = absolute_integral_df
+dict_res["celltypes"] = celltypes
+
 # Save results as dictionary
 with open(os.path.join(output_dir_results, f"dict_ripleys_L.pkl"), "wb") as f:
     pickle.dump(dict_res, f)
+
+# Plot signed and absolute matrix for a check 
+#----------------------------------------------------------------------------
+signed_df = dict_res["signed_integral_matrix"]
+absolute_df = dict_res["absolute_integral_matrix"]
+
+# Quick heatmap of signed integral
+plt.figure(figsize=(7, 6))
+sns.heatmap(signed_df, cmap="RdBu_r", center=0)
+plt.title("Signed Integral Heatmap (Cross-type Ripley's L)")
+plt.xlabel("Target Cell Type")
+plt.ylabel("Source Cell Type")
+plt.tight_layout()
+plt.savefig(args.output_dir_plots + '/signed_integral.svg', bbox_inches='tight')
+
+# Quick heatmap of absolute integral
+plt.figure(figsize=(7, 6))
+sns.heatmap(absolute_df, cmap="Reds")
+plt.title("Absolute Integral Heatmap (Cross-type Ripley's L)")
+plt.xlabel("Target Cell Type")
+plt.ylabel("Source Cell Type")
+plt.tight_layout()
+plt.savefig(args.output_dir_plots + '/absolute_integral.svg', bbox_inches='tight')
+
+
+
+
 
 #with open(os.path.join(output_dir_results, 'cross_ripley', f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "wb") as f:
 #    pickle.dump(res, f)
