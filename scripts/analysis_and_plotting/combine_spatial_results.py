@@ -210,11 +210,5 @@ with open(os.path.join(output_dir_results, 'combined_ripleys_L.pkl'), 'wb') as f
 
 
 
-
-
-
-
-
-
 print('Done combining results!')
 

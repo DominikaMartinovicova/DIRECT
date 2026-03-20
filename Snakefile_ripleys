@@ -1,0 +1,54 @@
+from scripts.analysis_and_plotting.utils import *
+import glob
+from snakemake.io import expand, dynamic
+
+configfile: "config.yaml"
+
+#+++++++++++++++++++++++++++++++++++++++ 0 PREPARE WILDCARDS AND TARGET ++++++++++++++++++++++++++++++++++++++++++++
+# Prepare wildcards and variables
+#-------------------------------------------------------------------------------------------------------------------
+data_dir = config["all"]["data_dir"]
+log_dir = config["all"]["log_dir"]
+phenotyping_level = config["phenotyping_level"]
+output_dir_results = config["all"]["output_dir_results"].format(phenotyping_level=phenotyping_level)
+output_dir_plots = config["all"]["output_dir_plots"].format(phenotyping_level=phenotyping_level)
+exclude_v17 = config["exclude_v17"]
+if exclude_v17:
+    ex_v17 = "wo_v1.7"
+elif not exclude_v17:
+    ex_v17 = "w_v1.7"
+print('Exclude v1.7 samples:', exclude_v17)
+
+adata_path = f"{data_dir}combined/{phenotyping_level}_combined_adatas.h5ad"
+#samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
+adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad"
+
+# Specify target rules
+#-------------------------------------------------------------------------------------------------------------------
+rule all:
+    input:
+        data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
+
+
+#++++++++++++++++++++++++++++++++++++++++++ 1 Calculate Ripley's statistics per cell +++++++++++++++++++++++++++++++++++++++++	
+# Perform cross type Ripley's L function analysis per cell
+#-------------------------------------------------------------------------------------------------------------------
+rule cross_ripleys_per_cell:
+    input:
+        adata_in = adata_processed_path
+        #adata_in = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_patch/Neutro_Epi_extImm_pooled_A_EM_N/200um_50um/patch_T23_004535_110005_1_window_25.h5ad'
+    output:
+        adata_out = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
+    params:
+        celltype_key = phenotyping_level,
+        coi = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"],
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/cross_type_ripleys_cell_level.py \
+        -i {input.adata_in} \
+        --phen_level {params.celltype_key} \
+        --coi {params.coi} \
+        -o {output.adata_out} \
+        """

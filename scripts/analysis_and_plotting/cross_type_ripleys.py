@@ -193,6 +193,7 @@ def cross_ripley(adata, cluster_key, type_i, type_j, spatial_key="spatial", n_st
     failed_sd = False
     if np.any(sd_sim == 0) or np.any(np.isnan(sd_sim)):
         failed_sd = True
+        
     # two-sided Monte Carlo p-values
     pvals = (np.sum(sims >= observed_L, axis=0) + 1) / (n_simulations + 1)
     pvals = np.minimum(pvals, 1 - pvals)
@@ -322,46 +323,3 @@ plt.ylabel("Source Cell Type")
 plt.tight_layout()
 plt.savefig(args.output_dir_plots + '/absolute_integral.svg', bbox_inches='tight')
 
-
-
-
-
-#with open(os.path.join(output_dir_results, 'cross_ripley', f"cross_ripley_{type_i}_vs_{type_j}.pkl"), "wb") as f:
-#    pickle.dump(res, f)
-
-
-
-
-
-
-
-
-
-
-
-# Calculate distance of each cell to the nearest border edge
-#--------------------------------------------------------------------------------
-#def distance_to_border(coords):
-#    xmin, ymin = coords.min(axis=0)
-#    xmax, ymax = coords.max(axis=0)
-#
-#    dx = np.minimum(coords[:,0] - xmin, xmax - coords[:,0])
-#    dy = np.minimum(coords[:,1] - ymin, ymax - coords[:,1])
-#
-#    return np.minimum(dx, dy)
-
-# Calculate cross-type Ripley's L function
-#--------------------------------------------------------------------------------
-#def _cross_L(coords_i, coords_j, radii, area):
-#    # Calculate pairwise distances between points of type i and type j
-#    n_i = coords_i.shape[0]
-#    n_j = coords_j.shape[0]
-#    distances = cdist(coords_i, coords_j)
-#    # For each radius, count the number of pairs (i,j) with distance <= r
-#    counts = np.array([np.sum(distances <= r) for r in radii])
-#    # Calculate K_ij and convert to L_ij
-#    lambda_j = n_j / area
-#    K_ij = counts / (n_i * lambda_j)
-#    L_ij = np.sqrt(K_ij / np.pi)
-#
-#    return L_ij
