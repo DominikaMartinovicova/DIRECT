@@ -18,6 +18,7 @@ if exclude_v17:
 elif not exclude_v17:
     ex_v17 = "w_v1.7"
 print('Exclude v1.7 samples:', exclude_v17)
+coi = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"],
 
 adata_path = f"{data_dir}combined/{phenotyping_level}_combined_adatas.h5ad"
 #samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
@@ -27,10 +28,10 @@ adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
+        data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad'
 
 
-#++++++++++++++++++++++++++++++++++++++++++ 1 Calculate Ripley's statistics per cell +++++++++++++++++++++++++++++++++++++++++	
+#++++++++++++++++++++++++++++++++++++++++++ 1 CALCULATE RIPLEY'S STATISTICS PER CELL +++++++++++++++++++++++++++++++++++++++++	
 # Perform cross type Ripley's L function analysis per cell
 #-------------------------------------------------------------------------------------------------------------------
 rule cross_ripleys_per_cell:
@@ -38,7 +39,7 @@ rule cross_ripleys_per_cell:
         adata_in = adata_processed_path
         #adata_in = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_patch/Neutro_Epi_extImm_pooled_A_EM_N/200um_50um/patch_T23_004535_110005_1_window_25.h5ad'
     output:
-        adata_out = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
+        adata_out = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad'
     params:
         celltype_key = phenotyping_level,
         coi = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"],
@@ -52,3 +53,28 @@ rule cross_ripleys_per_cell:
         --coi {params.coi} \
         -o {output.adata_out} \
         """
+
+
+
+#++++++++++++++++++++++++++++++++++++++++++ 2 COMPARE AND PLOT RIPLEY'S STATS +++++++++++++++++++++++++++++++++++++++++
+rule stat_analysis_cross_type_ripleys:
+    input:
+        adata_in = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad'
+    output:
+        adata_out = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_tmp.h5ad'
+    params:
+        celltype_key = phenotyping_level,
+        coi = coi,
+    #conda:
+    #    "xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/stat_analysis_cross_type_ripleys.py \
+        -i {input.adata_in} \
+        --phen_level {params.celltype_key} \
+        --coi {params.coi} \
+        -o {output.adata_out} \
+        """
+
+
+

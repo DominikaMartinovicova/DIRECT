@@ -36,6 +36,7 @@ from joblib import Parallel, delayed
 import argparse
 import os
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # Parse arguments from commandline
 #--------------------------------------------------------------------------------
@@ -50,17 +51,19 @@ def parse_args():
     parser.add_argument('--sample_key', default="sample", help='key for pieces of tissue/cores in adata.obs')
     parser.add_argument('--max_dist', type=float, default=250, help='maximum radius to calculate Ripley\'s stats')
     parser.add_argument('--n_steps', type=int, default=10, help='number of radii to calculate the stats for (evenly distributed between 0-max_dist)')
-    parser.add_argument('--n_sim', type=int, default=500, help='number of smulations to obtain null distribution')
+    parser.add_argument('--n_sim', type=int, default=10, help='number of simulations to obtain null distribution')
     return parser.parse_args()
 
 args = parse_args()
-
+#core = 'T23_004535_110005_1'
 adata = sc.read_h5ad(args.input)
+#adata = adata[adata.obs['sample']==core].copy()
 print(adata)
 cluster_key = args.phen_level
 print(adata.obs[cluster_key].value_counts())
 sample_key = args.sample_key
 coi_list = args.coi
+#coi_list=["B_cell", "T_cell_regulatory"]
 print(f'{len(coi_list)} celltypes of interest  {coi_list}.')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -73,19 +76,25 @@ min_j_threshold = 3
 rng = default_rng(42)   # set random seed for reproducibility
 
 coordinates = np.asarray(adata.obsm["spatial"])     # extract coordinates
+print(f'Coordinates: {coordinates.shape}, {coordinates[:10,:10]}')
 labels = np.asarray(adata.obs[cluster_key])         # extract labels 
+print(f'Labels: {labels.shape}, {labels[:10]}')
 samples = np.asarray(adata.obs[sample_key])
+print(f'Samples: {samples.shape}, {samples[:10]}')
+
 
 #radii = np.linspace(0, args.max_dist, args.n_steps)     # create list of radii to be tested
 radii = [25, 50, 75, 100, 250]
 n_r = len(radii)
-print(f'Radii to be tested: {radii}')
+print(f'{n_r} radii to be tested: {radii}')
 
 n_cells = adata.n_obs
-interactions = [f"{i}_{j}" for i, j in product(coi_list, coi_list) if i != j]
+interactions = [f"{i}_{j}" for i, j in product(coi_list, coi_list)]# if i != j]
 interaction_index = {k: i for i, k in enumerate(interactions)}
 n_interactions = len(interactions)
 print(f'Number of celltype pairs to be tested: {n_interactions}')
+print("Coordinate range (x, y):", np.ptp(coordinates, axis=0))
+print("Max radius:", radii[-1])
 
 # Arrays to store results
 #-------------------------------------------------------------------------------
@@ -111,17 +120,25 @@ def compute_edge_weights(coords, polygon, radii, max_weight=2.0):
 # Calculate cross-type Ripley's L function
 #--------------------------------------------------------------------------------
 def cross_L(coords_i, coords_j, radii, weights_i, lambda_j):
-    tree = cKDTree(coords_j)
-    neighbors = tree.query_ball_point(coords_i, radii[-1])
-    L = np.zeros((len(coords_i), len(radii)))
+    tree = cKDTree(coords_j)        # identify all type j cells
+    neighbors = tree.query_ball_point(coords_i, radii[-1])  # identify j neighbors of source cells within max radius
+    #print(f'Neighbors: {neighbors}, shape {neighbors.shape}')
+    L = np.zeros((len(coords_i), len(radii)))       # create np array with 0s to store results
+    n_skipped=0
     for i, idx in enumerate(neighbors):
-        if not idx:
+        if len(idx)==0:
+            n_skipped += 1
+            #print(f'No neighbors found within 250 radius. Skipping source cell {i}...')
             continue
         dists = np.linalg.norm(coords_j[idx] - coords_i[i], axis=1)
         dists.sort()
         counts = np.searchsorted(dists, radii)
         L[i, :] = (counts * weights_i[i]) / lambda_j
-    return np.sqrt(L / np.pi)
+    #print(f'Skipped {n_skipped} cells.')
+    #
+    # print(L)
+    #print(f'Number of nans in L: {np.sum(np.isnan(L))}')
+    return np.sqrt(L / np.pi)   # division makes this statistic into Ripley's L (before it was K even if variable was called L)
 
 # Process sample
 #--------------------------------------------------------------------------------
@@ -137,6 +154,7 @@ def process_sample(sample_id):
     polygon = Polygon(coords_core[hull.vertices])
 
     weights_core = compute_edge_weights(coords_core, polygon, radii)
+    #print(f"[WEIGHTS] Sample {sample_id} | {weights_core.shape} shape of weights_core; max weight: {np.nanmax(weights_core)}; min weight: {np.nanmin(weights_core)}; NaNs: {np.sum(np.isnan(weights_core))}")
 
     n_local = len(coords_core)
 
@@ -147,15 +165,17 @@ def process_sample(sample_id):
 
     # ---- observed
     for type_i, type_j in product(coi_list, coi_list):
-        if type_i == type_j:
-            continue
+        # if type_i == type_j:
+        #     continue
 
         idx_inter = interaction_index[f"{type_i}_{type_j}"]
 
         mask_i = labels_core == type_i
         mask_j = labels_core == type_j
+        #print(f"[DEBUG] Sample {sample_id} | {type_i}->{type_j} | n_source={np.sum(mask_i)}, n_target={np.sum(mask_j)}")
 
-        if np.sum(mask_i) < 3 or np.sum(mask_j) < 3:
+        if np.sum(mask_i) < min_i_threshold or np.sum(mask_j) < min_j_threshold:
+            #print(f"[DEBUG] Skipping {type_i}->{type_j} due to min threshold")
             continue
 
         coords_i = coords_core[mask_i]
@@ -163,11 +183,16 @@ def process_sample(sample_id):
         weights_i = weights_core[mask_i]
 
         lambda_j = len(coords_j) / polygon.area
-
+        #print(f'Calculating cross type L for {type_i}->{type_j}')
         L = cross_L(coords_i, coords_j, radii, weights_i, lambda_j)
+        #print(f'[OBSERVED] {type_i} -> {type_j} | L shape: {L.shape}, NaNs in L: {np.sum(np.isnan(L))}')
+
+        neighbor_fraction = np.sum(~np.isnan(L).any(axis=1)) / len(L)
+        #print(f"[COVERAGE] {type_i} -> {type_j} | fraction of source cells with ≥1 neighbor: {neighbor_fraction:.2%}")
 
         obs_local[mask_i, idx_inter, :] = L
-
+        #print(f'obs_local shape: {obs_local.shape}')
+        #print(f'Number of nans in obs_local: {np.sum(np.isnan(obs_local))}')
     # ---- simulations
     for s in range(args.n_sim):
         if s % 100 == 0:
@@ -175,8 +200,8 @@ def process_sample(sample_id):
         perm = rng.permutation(labels_core)
 
         for type_i, type_j in product(coi_list, coi_list):
-            if type_i == type_j:
-                continue
+            # if type_i == type_j:
+            #     continue
 
             idx_inter = interaction_index[f"{type_i}_{type_j}"]
 
@@ -184,6 +209,7 @@ def process_sample(sample_id):
             mask_j = perm == type_j
 
             if np.sum(mask_i) < min_i_threshold or np.sum(mask_j) < min_j_threshold:
+                #print(f"[DEBUG] Skipping simulation {type_i}->{type_j} due to min threshold")
                 continue
 
             coords_i = coords_core[mask_i]
@@ -197,6 +223,8 @@ def process_sample(sample_id):
             sim_sum[mask_i, idx_inter, :] += L
             sim_sq[mask_i, idx_inter, :] += L**2
             sim_valid[mask_i, idx_inter] += 1
+            #print(f'Simulation {s}')
+            #print(f'sim_sum: \n {sim_sum[:5,:5,0]}, \n sim_sq: \n {sim_sq[:5,:5,0]}, \n sim_valid: \n {sim_valid[:5,:5]}')
 
     print(f"[DONE] Sample {sample_id}")
     return global_idx, obs_local, sim_sum, sim_sq, sim_valid
@@ -219,30 +247,117 @@ for idx, o, ss, sq, sv in results:
     sim_sum[idx] = ss
     sim_sq[idx] = sq
     sim_valid[idx] = sv
+    print(f'obs_curve shape: {obs_curve.shape}, sim_sum shape: {sim_sum.shape}, sim_sq shape: {sim_sq.shape}, sim_valid shape: {sim_valid.shape}')
+    print(obs_curve[:5,:5,0])
+    print(sim_sum[:5,:5,0])
+    print(sim_sq[:5,:5,0])
+    print(sim_valid[:5,:5])
+    
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 4 Statistics
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 valid_expanded = np.maximum(sim_valid[..., None], 1)
+print(f'valid_expanded shape: {valid_expanded.shape}, sim_valid shape: {sim_valid.shape}')
 
 sim_mean = sim_sum / valid_expanded
+print(f'sim_mean shape: {sim_mean.shape}, sim_mean[:5,:5,0]: \n {sim_mean[:5,:5,0]}')
 sim_var = (sim_sq / valid_expanded) - sim_mean**2
-sim_std = np.sqrt(np.maximum(sim_var, 1e-8))
+print(f'sim_var shape: {sim_var.shape}, sim_var[:5,:5,0]: \n {sim_var[:5,:5,0]}')
+sim_std = np.sqrt(np.maximum(sim_var, 1e-4))
+print(f'sim_std shape: {sim_std.shape}, sim_std[:5,:5,0]: \n {sim_std[:5,:5,0]}')
 
 # Z-score
 z_scores = (obs_curve - sim_mean) / sim_std
 
-invalid_mask = ((sim_valid == 0)[..., None] |np.isnan(obs_curve) |(sim_std < 1e-6))
+# filter low support simulations and invalid values
+min_valid = int(args.n_sim * 0.3)
 
+invalid_mask = ((sim_valid == 0)[..., None] |np.isnan(obs_curve) |(sim_std < 1e-6)|(sim_valid < min_valid)[..., None])
+print(f'Invalid mask shape: {invalid_mask.shape}, sim_valid shape: {sim_valid.shape}, obs_curve shape: {obs_curve.shape}, sim_std shape: {sim_std.shape}')
+print(f'Number of invalid entries: {np.sum(invalid_mask)}, total entries: {invalid_mask.size}, fraction invalid: {np.sum(invalid_mask)/invalid_mask.size:.2%}')
+print(f'Invalid mask sample: \n {invalid_mask[:5,:5,0]}')
 z_scores[invalid_mask] = np.nan
+
+# plot distribution of z-scores and sim std to check if they look reasonable
+n_r = sim_std.shape[-1]
+
+fig, axes = plt.subplots(1, n_r, figsize=(4*n_r, 4), sharey=True)
+
+for k in range(n_r):
+    ax = axes[k] if n_r > 1 else axes
+
+    std_k = sim_std[..., k].flatten()
+    valid_k = sim_valid.flatten()
+
+    mask = ~np.isnan(std_k)
+    
+    std_filtered = std_k[mask]
+    valid_filtered = valid_k[mask]
+
+    # 5. Proceed with log and plotting using the filtered versions
+    #log_std = np.log10(std_filtered + 1e-10)
+    high_support = valid_filtered >= min_valid
+    low_support = valid_filtered < min_valid
+
+    # plot
+    ax.hist(std_filtered[high_support], bins=100, alpha=0.7,color='blue', label='High support')
+    ax.hist(std_filtered[low_support], bins=100, alpha=0.7, color='red', label='Low support')
+
+    ax.set_yscale('log')
+    ax.set_title(f'Radius = {radii[k]} µm')
+    ax.set_xlabel('Standard deviation')
+
+    if k == 0:
+        ax.set_ylabel('Frequency (log scale)')
+
+    ax.legend()
+
+plt.tight_layout()
+plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N_old/spatial/patching/5000um_50um/sim_std_per_radius.png', dpi=300)
+plt.close()
+
+
+fig, axes = plt.subplots(1, n_r, figsize=(4*n_r, 4), sharey=True)
+
+for k in range(n_r):
+    ax = axes[k] if n_r > 1 else axes
+
+    std_k = sim_std[..., k].flatten()
+    valid_k = sim_valid.flatten()
+
+    mask = ~np.isnan(std_k)
+    
+    std_filtered = std_k[mask]
+    valid_filtered = valid_k[mask]
+
+    log_std = np.log10(std_filtered + 1e-10)
+    high_support = valid_filtered >= min_valid
+    low_support = valid_filtered < min_valid
+
+    ax.hist(log_std[high_support], bins=100, alpha=0.7,color='blue', label='High support')
+    ax.hist(log_std[low_support], bins=100, alpha=0.7,color='red', label='Low support')
+
+    ax.set_yscale('log')
+    ax.set_title(f'Radius = {radii[k]} µm')
+    ax.set_xlabel('log10(std)')
+
+    if k == 0:
+        ax.set_ylabel('Frequency (log scale)')
+
+    ax.legend()
+
+plt.tight_layout()
+plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N_old/spatial/patching/5000um_50um/sim_std_log_per_radius.png', dpi=300)
+plt.close()
 
 
 
 # integrals
 diff = obs_curve - sim_mean
-signed = np.trapz(diff, radii, axis=2)
-absolute = np.trapz(np.abs(diff), radii, axis=2)
+signed = np.trapezoid(diff, radii, axis=2)
+absolute = np.trapezoid(np.abs(diff), radii, axis=2)
 
 # Store in adata
 #----------------------------------------------------------------------------
