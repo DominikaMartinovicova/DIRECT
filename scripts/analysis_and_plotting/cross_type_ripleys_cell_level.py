@@ -52,16 +52,19 @@ def parse_args():
     parser.add_argument('--sample_key', default="sample", help='key for pieces of tissue/cores in adata.obs')
     parser.add_argument('--max_dist', type=float, default=250, help='maximum radius to calculate Ripley\'s stats')
     parser.add_argument('--n_steps', type=int, default=10, help='number of radii to calculate the stats for (evenly distributed between 0-max_dist)')
-    parser.add_argument('--n_sim', type=int, default=100, help='number of simulations to obtain null distribution')
+    parser.add_argument('--n_sim', type=int, default=500, help='number of simulations to obtain null distribution')
     return parser.parse_args()
 
 args = parse_args()
+#core = 'T23_004535_110005_1'
 adata = sc.read_h5ad(args.input)
+# adata = adata[adata.obs['sample']==core].copy()
 print(adata)
 cluster_key = args.phen_level
 print(adata.obs[cluster_key].value_counts())
 sample_key = args.sample_key
 coi_list = args.coi
+#coi_list=["B_cell", "Macrophage", "Macrophage_alveolar", "T_cell_regulatory"]
 print(f'{len(coi_list)} celltypes of interest  {coi_list}.')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -169,6 +172,8 @@ def process_sample(sample_id):
 
         obs_local[mask_i, idx_inter, :] = L     # store the observed L values for the source cells of type i and interaction with target type j in the results array
 
+    print(np.nanmean(obs_local[:,idx_inter,:],axis=0))   # print mean observed L across source cells for the last processed interaction as a quick check of the results
+    
     # ----------------- Perform simulations to get null distribution of Ripley's L ----------------------
     for s in range(args.n_sim):
         if s % 100 == 0:
@@ -199,6 +204,17 @@ def process_sample(sample_id):
     sim_mean_sample = np.nanmean(sim_L, axis=0)   # (interactions × radii)
     sim_std_sample  = np.nanstd(sim_L, axis=0)    # (interactions × radii)
 
+    # # plot all the simulation curves for one interaction as a quick check of the simulation results
+    # plt.figure(figsize=(8,6))
+    # for s in range(args.n_sim):
+    #     plt.plot(radii, sim_L[s, idx_inter, :], color='gray', alpha=0.3)
+    # plt.plot(radii, obs_local[mask_i, idx_inter, :].mean(axis=0), color='red', label='Observed L')
+    # plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N_old/spatial/patching/5000um_50um/interactions/{core}_sim_curves.png", bbox_inches='tight')
+    # plt.close()
+
+
+    print(sim_mean_sample)
+    print(sim_std_sample)
 
     print(f"[DONE] Sample {sample_id}")
     return global_idx, obs_local, sim_mean_sample, sim_std_sample, sim_valid_inter
@@ -230,14 +246,17 @@ for sample_id, (idx, o, sm, ss, sv) in zip(sample_list, results):
 # Z-score
 z_scores_unfiltered = np.full_like(obs_curve, np.nan)
 invalid_mask = np.zeros_like(z_scores_unfiltered, dtype=bool)
+min_std = 0.1  # minimum std to consider the simulation valid to prevent division by very small number and exploding of z score
 
 for sample_id in sample_list:
     mask = samples == sample_id
     sm = sim_mean_dict[sample_id]   # (interactions × radii)
     ss = sim_std_dict[sample_id]
-    z_scores_unfiltered[mask] = (obs_curve[mask] - sm[None, :, :]) / ss[None, :, :] #!!! prevent division by very small number to prevent exploding of the z score
+    low_std_mask = (ss <= min_std) | (~np.isfinite(ss))  # identify interactions with low simulation support (std too low or NaN) to filter out later
+    safe_std = np.where(low_std_mask, np.nan, ss)
+    z_scores_unfiltered[mask] = (obs_curve[mask] - sm[None, :, :]) / safe_std[None, :, :] #!!! prevent division by very small number to prevent exploding of the z score
 
-    invalid_mask[mask] = (np.isnan(obs_curve[mask]) | (ss[None,:,:] <= 1e-3))  # mark as invalid if observed curve is NaN or if simulated std is too low (indicating low simulation support)
+    invalid_mask[mask] = (np.isnan(obs_curve[mask]) | low_std_mask[None,:,:])  # mark as invalid if observed curve is NaN or if simulated std is too low (indicating low simulation support)
 
 z_scores = z_scores_unfiltered.copy()
 z_scores[invalid_mask] = np.nan
@@ -250,12 +269,14 @@ for sample_id in sample_list:
     sm = sim_mean_dict[sample_id]
     diff[mask] = obs_curve[mask] - sm[None, :, :]
 
+diff[invalid_mask] = np.nan  # set diff to NaN for invalid interactions
 signed = np.trapezoid(diff, radii, axis=2)
 absolute = np.trapezoid(np.abs(diff), radii, axis=2)
 
 # Store in adata
 #----------------------------------------------------------------------------
 adata.obsm["ripley_z"] = z_scores.astype(np.float32)
+adata.obsm["ripley_z_unfiltered"] = z_scores_unfiltered.astype(np.float32)
 adata.obsm["ripley_signed"] = signed.astype(np.float32)
 adata.obsm["ripley_abs"] = absolute.astype(np.float32)
 adata.obsm["ripley_z_max"] = np.nanmax(np.abs(z_scores), axis=2).astype(np.float32)
@@ -273,6 +294,9 @@ adata.uns["ripley_params"] = {
     "min_j_threshold": min_j_threshold,
     "method": "interaction-level null, per-sample normalization"
 }
+
+print("NaN fraction in Z:", np.mean(np.isnan(z_scores)))
+print("Min/Max Z:", np.nanmin(z_scores), np.nanmax(z_scores))
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 5 Save the analyzed adata

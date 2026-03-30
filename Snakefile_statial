@@ -1,6 +1,6 @@
-from scripts.analysis_and_plotting.utils import *
-import glob
-from snakemake.io import expand, dynamic
+#from scripts.analysis_and_plotting.utils import *
+#import glob
+#from snakemake.io import expand, dynamic
 
 configfile: "config.yaml"
 
@@ -23,59 +23,66 @@ coi = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_c
 adata_path = f"{data_dir}combined/{phenotyping_level}_combined_adatas.h5ad"
 #samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
 adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad"
-
+core = 'T23_004535_110005_1'
 # Specify target rules
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
         #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad',
-        data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
+        #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
+        out_file = data_dir + f'analyzed/{phenotyping_level}_samples_kontextual.tsv'
 
 
-#++++++++++++++++++++++++++++++++++++++++++ 1 CALCULATE RIPLEY'S STATISTICS PER CELL +++++++++++++++++++++++++++++++++++++++++	
+#++++++++++++++++++++++++++++++++++++++++++ 1  +++++++++++++++++++++++++++++++++++++++++	
 # Perform cross type Ripley's L function analysis per cell
 #-------------------------------------------------------------------------------------------------------------------
-rule cross_ripleys_per_cell:
+rule parent_combinations:
     input:
-        adata_in = adata_processed_path
+        #adata_in = adata_processed_path
         #adata_in = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_patch/Neutro_Epi_extImm_pooled_A_EM_N/200um_50um/patch_T23_004535_110005_1_window_25.h5ad'
     output:
-        adata_out = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
-    params:
-        celltype_key = phenotyping_level,
-        coi = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"],
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/cross_type_ripleys_cell_level.py \
-        -i {input.adata_in} \
-        --phen_level {params.celltype_key} \
-        --coi {params.coi} \
-        -o {output.adata_out} \
-        """
+        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
+    conda:
+        "/appdata/users/P083831/conda_envs/r_statial"
+    script:
+        "scripts/analysis_and_plotting/parent_combinations.R"
 
 
 
-#++++++++++++++++++++++++++++++++++++++++++ 2 COMPARE AND PLOT RIPLEY'S STATS +++++++++++++++++++++++++++++++++++++++++
-rule stat_analysis_cross_type_ripleys:
+
+#++++++++++++++++++++++++++++++++++++++++++ 2  +++++++++++++++++++++++++++++++++++++++++
+rule kontextual:
     input:
-        adata_in = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad'
+        adata_in = adata_processed_path,
+        #adata_in = data_dir + f'adata_per_sample/{phenotyping_level}/{core}.h5ad',
+        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
     output:
-        adata_out = data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_tmp.h5ad'
+        out_file = data_dir + f'analyzed/{phenotyping_level}_samples_kontextual.tsv',
     params:
         celltype_key = phenotyping_level,
-        coi = coi,
-    #conda:
-    #    "xenium_py310"
-    shell:
-        """
-        python3 scripts/analysis_and_plotting/stat_analysis_cross_type_ripleys.py \
-        -i {input.adata_in} \
-        --phen_level {params.celltype_key} \
-        --coi {params.coi} \
-        -o {output.adata_out} \
-        """
+        coi = coi
+    threads:
+        20
+    conda:
+        "/appdata/users/P083831/conda_envs/r_statial"
+    script:
+        "scripts/analysis_and_plotting/kontextual.R"
+    
 
 
-
+# rule plot_kontextual:
+#     input:
+#         #adata_in = adata_processed_path,
+#         adata_in = data_dir + f'adata_per_sample/{phenotyping_level}/{core}.h5ad',
+#         parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
+#     output:
+#         out_plot = output_dir_plots + f'spatial/per_sample/{core}/'
+#     params:
+#         celltype_key = phenotyping_level,
+#         coi = coi
+#     threads:
+#         20
+#     conda:
+#         "/appdata/users/P083831/conda_envs/r_statial"
+#     script:
+#         "scripts/analysis_and_plotting/plot_kontextual.R"

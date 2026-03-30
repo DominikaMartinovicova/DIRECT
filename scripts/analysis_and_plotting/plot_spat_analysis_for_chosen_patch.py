@@ -205,20 +205,27 @@ input_dir = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis
 
 # Check Ripley's calculations
 #----------------------------------------------------------------------------
-adata = sc.read_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/analyzed/Neutro_Epi_extImm_pooled_A_EM_N_adatas_ripleys_{core}.h5ad')
-mask = adata.obs["sample"] == core
-obs_curve = adata.uns["ripley_obs_curve"]
-sim_mean = adata.uns["ripley_sim_mean"]
-sim_std = adata.uns["ripley_sim_std"]
+adata_s = sc.read_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/analyzed/Neutro_Epi_extImm_pooled_A_EM_N_adatas_ripleys_{core}.h5ad')
 
-# extract metadata
-interactions = adata.uns["ripley_interactions"]
 celltypes = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"]
-#celltypes=["B_cell", "T_cell_regulatory","Macrophage_alveolar","Tumor_cells","Macrophage"]
-print(celltypes)
-n_types = len(celltypes)
+interactions = adata_s.uns["ripley_interactions"]
+radii = adata_s.uns["ripley_params"]["radii"]
 
-radii = np.array(adata.uns["ripley_params"]["radii"])
+obs_curve = adata_s.uns["ripley_obs_curve"]
+z_scores = adata_s.obsm["ripley_z"]
+print(z_scores.shape)
+
+sim_mean = adata_s.uns["ripley_sim_mean"][core]
+sim_std  = adata_s.uns["ripley_sim_std"][core]
+
+interactions = adata_s.uns["ripley_interactions"]
+radii = adata_s.uns["ripley_params"]["radii"]
+
+# aggregate
+obs_mean = np.nanmean(obs_curve, axis=0)
+z_mean   = np.nanmean(z_scores, axis=0)
+print(z_mean.shape)
+
 
 # helper to create matrix of celltype x celltype
 def interaction_to_matrix(values, interactions, celltypes):
@@ -233,112 +240,214 @@ def interaction_to_matrix(values, interactions, celltypes):
 
     return mat
 
-# Z score at different radii
-z_tensor = adata.uns["ripley_z"]
-print(z_tensor.shape)  # (cells, interactions, radii)
-print(z_tensor[:5, :5,0])
-print(np.isnan(z_tensor).sum())
+# observed curve and simulated curve
+for i, name in enumerate(interactions):
+    plt.figure(figsize=(5,4))
+    
+    plt.plot(radii, obs_mean[i], label="Observed", color='orange', marker='o')
+    plt.plot(radii, sim_mean[i], label="Simulated", color='gray', linestyle='--')
+    
+    # optional confidence band
+    plt.fill_between(radii,sim_mean[i] - 1.96*sim_std[i],sim_mean[i] + 1.96*sim_std[i],alpha=0.3)
+    
+    plt.xlabel("Radius")
+    plt.ylabel("Ripley's L")
+    plt.title(name)
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/{core}_{name}_curve.png", bbox_inches='tight')
+    plt.close()
 
-#interactions_list = ['T_cell_regulatory_B_cell','B_cell_Stromal','Macrophage_alveolar_Macrophage','Macrophage_alveolar_Tumor_cells','Tumor_cells_Macrophage_alveolar','NK_cell_Stromal','Stromal_NK_cell']
-for interaction in interactions:
-    print(interaction)
-    idx_inter = np.where(interactions == interaction)[0][0]
+# integrals
+signed = adata_s.obsm["ripley_signed"]
+absolute = adata_s.obsm["ripley_abs"]
 
-    # average across cells in sample
-    z_mean_curve = np.nanmean(z_tensor[mask, idx_inter, :], axis=0)
-    print(z_mean_curve[:5])
+signed_mean = np.nanmean(signed, axis=0)
+absolute_mean = np.nanmean(absolute, axis=0)
 
-    plt.figure()
-    plt.plot(radii, z_mean_curve, marker='o')
-    plt.axhline(0, linestyle='--')
-    plt.title(f"Z-score curve: {interaction} ({core})")
+signed_mat = interaction_to_matrix(signed_mean, interactions, celltypes)
+abs_mat    = interaction_to_matrix(absolute_mean, interactions, celltypes)
+
+plt.figure(figsize=(8,6))
+
+sns.heatmap(
+    signed_mat,
+    xticklabels=celltypes,
+    yticklabels=celltypes,
+    cmap="RdBu_r",
+    vmax = 40000,
+    center=0,
+    square=True,
+    cbar_kws={"label": "Signed integral"}
+)
+
+plt.title(f"{core} - Signed interaction")
+plt.xticks(rotation=45, ha="right")
+plt.yticks(rotation=0)
+plt.tight_layout()
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_signed_heatmap.png", bbox_inches='tight')
+plt.close()
+
+plt.figure(figsize=(8,6))
+
+sns.heatmap(
+    abs_mat,
+    xticklabels=celltypes,
+    yticklabels=celltypes,
+    cmap="Reds",
+    square=True,
+    cbar_kws={"label": "Absolute integral"}
+)
+
+plt.title(f"{core} - Absolute interaction")
+plt.xticks(rotation=45, ha="right")
+plt.yticks(rotation=0)
+plt.tight_layout()
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_absolute_heatmap.png", bbox_inches='tight')
+plt.close()
+
+# z-score
+z_mean_inter = np.nanmean(z_mean, axis=1) #!!!!!!! cannot be mean because of irregular steps in radii, max radius is 250
+z_mat = interaction_to_matrix(z_mean_inter, interactions, celltypes)
+
+
+plt.figure(figsize=(10,8))
+sns.heatmap(
+    z_mat,
+    xticklabels=celltypes,
+    yticklabels=celltypes,
+    cmap="RdBu_r",
+    center=0,
+    vmin=-200, vmax=200,   # IMPORTANT: consistent scaling
+    square=True,
+    cbar_kws={"label": "Z-score"}
+)
+
+plt.title(f"{core} - Z-score heatmap")
+plt.tight_layout()
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_z_heatmap.png", bbox_inches='tight')
+plt.close()
+
+n_r = z_mean.shape[1]
+
+fig, axes = plt.subplots(1, n_r, figsize=(6*n_r, 6))
+
+if n_r == 1:
+    axes = [axes]
+
+for k in range(n_r):
+    z_k = z_mean[:, k]  # z-scores for this radius
+
+    # convert to matrix (same function you already use)
+    z_mat = interaction_to_matrix(z_k, interactions, celltypes)
+
+    sns.heatmap(
+        z_mat,
+        xticklabels=celltypes,
+        yticklabels=celltypes,
+        cmap="RdBu_r",
+        center=0,
+        vmin=-200, vmax=200,  # keep consistent scale
+        square=True,
+        cbar=(k == n_r - 1),  # only show one colorbar
+        ax=axes[k]
+    )
+
+    axes[k].set_title(f"r = {radii[k]}")
+
+plt.suptitle(f"{core} - Z-score per radius", y=1.02)
+plt.tight_layout()
+
+plt.savefig(
+    f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_z_heatmap_per_radius.png",
+    bbox_inches='tight'
+)
+plt.close()
+
+# z-score curves
+for i, name in enumerate(interactions):
+    plt.figure(figsize=(5,4))
+    
+    plt.plot(radii, z_mean[i])
+    plt.axhline(0, linestyle="--")
+    
     plt.xlabel("Radius")
     plt.ylabel("Z-score")
-    plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/cross_ripley_zscore_{interaction}_{core}.png', bbox_inches='tight')
-    plt.close()
-
-
-    # Ripley's stats curve
-    obs = np.nanmean(obs_curve[mask, idx_inter, :], axis=0)
-    print(obs[:5])
-    sim_m = np.nanmean(sim_mean[mask, idx_inter, :], axis=0)
-    sim_s = np.nanmean(sim_std[mask, idx_inter, :], axis=0)
-    upper = sim_m + 1.96 * sim_s
-    lower = sim_m - 1.96 * sim_s
-
-    plt.figure(figsize=(6,5))
-
-    # shift by CSR
-    obs_shift = obs #- radii
-    sim_shift = sim_m #- radii
-    upper_shift = upper #- radii
-    lower_shift = lower #- radii
-
-    plt.fill_between(radii, lower_shift, upper_shift, alpha=0.3, label="95% envelope")
-    plt.plot(radii, sim_shift, linestyle='--', label="Simulation mean")
-    plt.plot(radii, obs_shift, marker='o', label="Observed")
-
-    plt.axhline(0, linestyle=':', color='black')
-
-    plt.xlabel("Radius")
-    plt.ylabel("L(r)") # - r)
-    plt.title(f"{interaction} ({core})")
-    plt.legend()
+    plt.title(name)
+    
     plt.tight_layout()
-    plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/cross_ripley_curve_{interaction}_{core}.png', bbox_inches='tight')
+    plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/zcurve_{core}_{name}.png", bbox_inches='tight')
     plt.close()
 
-
-
-
-# Heatmaps of integrals
-signed = np.nanmean(adata.obsm["ripley_signed"][mask], axis=0)
-absolute = np.nanmean(adata.obsm["ripley_abs"][mask], axis=0)
-
-signed_mat = interaction_to_matrix(signed, interactions, celltypes)
-abs_mat = interaction_to_matrix(absolute, interactions, celltypes)
-print(signed_mat[:5,:5])
-print(abs_mat[:5,:5])
-
-
+# multiple interactions in one plot
 plt.figure(figsize=(6,5))
-sns.heatmap(signed_mat, xticklabels=celltypes, yticklabels=celltypes,cmap="RdBu_r", center=0,vmax=50000)
-plt.title(f"Signed Ripley integral ({core})")
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_signed_{core}.png', bbox_inches='tight')
-plt.close()
 
+for i in range(len(interactions)):
+    plt.plot(radii, z_mean[i], alpha=0.3)
 
-plt.figure(figsize=(6,5))
-sns.heatmap(abs_mat, xticklabels=celltypes, yticklabels=celltypes,cmap="Reds",vmax=50000)
-plt.title(f"Absolute Ripley integral ({core})")
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_abs_{core}.png', bbox_inches='tight')
+plt.axhline(0, linestyle="--")
+plt.xlabel("Radius")
+plt.ylabel("Z-score")
+plt.title(f"{core} - all interactions")
+
+plt.tight_layout()
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/{core}_z_all.png", bbox_inches='tight')
 plt.close()
 
 
 
 
-# Heatmap of mean z scores in all interactions
-z_mean = np.nanmean(
-    np.nanmean(z_tensor[mask], axis=0),  # cells → mean
-    axis=1                               # radii → mean
-)
-print(z_mean[:5])
+# print("Radii:", radii)
+# print("Interactions:", interactions)
+# print(adata_s.uns["ripley_sim_mean"])
+# print(adata_s.uns["ripley_sim_std"])
 
-z_mat = interaction_to_matrix(z_mean, interactions, celltypes)
-plt.figure(figsize=(6,5))
-sns.heatmap(z_mat, xticklabels=celltypes, yticklabels=celltypes,
-            cmap="RdBu_r", center=0)#, vmax=100, vmin=-100)
-plt.title(f"Mean Z-score ({core})")
-plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_zscore_{core}.png', bbox_inches='tight')
+n_r = len(adata_s.uns["ripley_params"]["radii"])
+radii = adata_s.uns["ripley_params"]["radii"]
+
+fig, axes = plt.subplots(nrows=1, ncols=n_r, figsize=(15, 10))
+axes = axes.flatten()
+
+for k in range(n_r):
+    std_k = []
+    
+    for ss in adata_s.uns["ripley_sim_std"].values():
+        std_k.append(ss[:, k])   # all interactions for radius k
+    
+    std_k = np.concatenate(std_k)
+    std_k = std_k[np.isfinite(std_k)]
+    
+    axes[k].hist(np.log10(std_k), bins=20)
+    axes[k].set_title(f"r = {radii[k]}")
+    axes[k].set_xlabel("log10(std)")
+    axes[k].set_ylabel("count")
+
+plt.tight_layout()
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_sim_log_std_per_radius.png", bbox_inches='tight')
 plt.close()
 
 
+fig, axes = plt.subplots(nrows=1, ncols=n_r, figsize=(15, 10))
+axes = axes.flatten()
 
+for k in range(n_r):
+    std_k = []
+    
+    for ss in adata_s.uns["ripley_sim_std"].values():
+        std_k.append(ss[:, k])   # all interactions for radius k
+    
+    std_k = np.concatenate(std_k)
+    std_k = std_k[np.isfinite(std_k)]
+    
+    axes[k].hist(std_k, bins=20)
+    axes[k].set_title(f"r = {radii[k]}")
+    axes[k].set_xlabel("std")
+    axes[k].set_ylabel("count")
 
-
-
-
-
+plt.tight_layout()
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_sim_std_per_radius.png",bbox_inches='tight')
+plt.close()
 
 
 
