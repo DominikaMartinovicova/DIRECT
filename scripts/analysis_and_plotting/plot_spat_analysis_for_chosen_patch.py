@@ -205,7 +205,7 @@ input_dir = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis
 
 # Check Ripley's calculations
 #----------------------------------------------------------------------------
-adata_s = sc.read_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/analyzed/Neutro_Epi_extImm_pooled_A_EM_N_adatas_ripleys_{core}.h5ad')
+adata_s = sc.read_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/analyzed/Neutro_Epi_extImm_pooled_A_EM_N_adatas_ripleys_{core}_gpt.h5ad')
 
 celltypes = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"]
 interactions = adata_s.uns["ripley_interactions"]
@@ -256,7 +256,7 @@ for i, name in enumerate(interactions):
     plt.legend()
     
     plt.tight_layout()
-    plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/{core}_{name}_curve.png", bbox_inches='tight')
+    plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/interactions/{core}_{name}_curve.png", bbox_inches='tight')
     plt.close()
 
 # integrals
@@ -286,7 +286,7 @@ plt.title(f"{core} - Signed interaction")
 plt.xticks(rotation=45, ha="right")
 plt.yticks(rotation=0)
 plt.tight_layout()
-plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_signed_heatmap.png", bbox_inches='tight')
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/{core}_signed_heatmap.png", bbox_inches='tight')
 plt.close()
 
 plt.figure(figsize=(8,6))
@@ -304,7 +304,7 @@ plt.title(f"{core} - Absolute interaction")
 plt.xticks(rotation=45, ha="right")
 plt.yticks(rotation=0)
 plt.tight_layout()
-plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_absolute_heatmap.png", bbox_inches='tight')
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/{core}_absolute_heatmap.png", bbox_inches='tight')
 plt.close()
 
 # z-score
@@ -326,7 +326,7 @@ sns.heatmap(
 
 plt.title(f"{core} - Z-score heatmap")
 plt.tight_layout()
-plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_z_heatmap.png", bbox_inches='tight')
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/{core}_z_heatmap.png", bbox_inches='tight')
 plt.close()
 
 n_r = z_mean.shape[1]
@@ -360,7 +360,7 @@ plt.suptitle(f"{core} - Z-score per radius", y=1.02)
 plt.tight_layout()
 
 plt.savefig(
-    f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{core}_z_heatmap_per_radius.png",
+    f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/{core}_z_heatmap_per_radius.png",
     bbox_inches='tight'
 )
 plt.close()
@@ -377,7 +377,7 @@ for i, name in enumerate(interactions):
     plt.title(name)
     
     plt.tight_layout()
-    plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/zcurve_{core}_{name}.png", bbox_inches='tight')
+    plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/interactions/zcurve_{core}_{name}.png", bbox_inches='tight')
     plt.close()
 
 # multiple interactions in one plot
@@ -392,7 +392,7 @@ plt.ylabel("Z-score")
 plt.title(f"{core} - all interactions")
 
 plt.tight_layout()
-plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/interactions/{core}_z_all.png", bbox_inches='tight')
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/interactions/{core}_z_all.png", bbox_inches='tight')
 plt.close()
 
 
@@ -424,7 +424,7 @@ for k in range(n_r):
     axes[k].set_ylabel("count")
 
 plt.tight_layout()
-plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_sim_log_std_per_radius.png", bbox_inches='tight')
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/cross_ripley_sim_log_std_per_radius.png", bbox_inches='tight')
 plt.close()
 
 
@@ -446,12 +446,23 @@ for k in range(n_r):
     axes[k].set_ylabel("count")
 
 plt.tight_layout()
-plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_sim_std_per_radius.png",bbox_inches='tight')
+plt.savefig(f"/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um_gpt/cross_ripley_sim_std_per_radius.png",bbox_inches='tight')
 plt.close()
 
 
+# adata = sc.read_h5ad('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_sample/Neutro_Epi_extImm_pooled_A_EM_N/T23_004535_110005_1.h5ad')
 
+# adata.obs['celltypenew'] = adata.obs[phenotyping_level].copy()
 
+# adata.obs['celltypenew'] = adata.obs['celltypenew'].cat.add_categories(['non_malignant'])
+
+# adata.obs['celltypenew'] = adata.obs['celltypenew'].where(
+#     adata.obs['celltypenew'].isin(['Tumor_cells', 'Stromal']),
+#     'non_malignant'
+# )
+
+# sq.pl.spatial_scatter(adata, color="celltypenew", size=1,shape=None,figsize=(10,10))
+# plt.savefig('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/per_sample/T23_004535_110005_1/Stromal_Tumor_cells_spatial_scatter.png', dpi=300, bbox_inches='tight')
 
 
 

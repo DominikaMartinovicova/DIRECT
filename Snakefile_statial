@@ -1,6 +1,7 @@
 #from scripts.analysis_and_plotting.utils import *
 #import glob
-#from snakemake.io import expand, dynamic
+from snakemake.io import expand
+import pandas as pd
 
 configfile: "config.yaml"
 
@@ -18,23 +19,27 @@ if exclude_v17:
 elif not exclude_v17:
     ex_v17 = "w_v1.7"
 print('Exclude v1.7 samples:', exclude_v17)
-coi = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"],
+#coi = ["B_cell", "Macrophage", "Macrophage_alveolar", "NK_cell", "Stromal", "T_cell_CD4", "T_cell_CD8_functional", "T_cell_CD8_terminally_exhausted", "T_cell_regulatory", "Tumor_cells"],
+coi = ["B_cell","Tumor_cells"]
 
 adata_path = f"{data_dir}combined/{phenotyping_level}_combined_adatas.h5ad"
 #samples_list, adata, ex_v17 = preprocess_adata(adata_path, exclude_v17=exclude_v17, phenotyping_level=phenotyping_level)
 adata_processed_path = data_dir + f"combined/{phenotyping_level}_combined_adatas_for_analysis_{ex_v17}.h5ad"
 core = 'T23_004535_110005_1'
+samples_list = pd.read_csv('/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_sample/Neutro_Epi_extImm_pooled_A_EM_N/samples_metadata.csv')['sample'].tolist()
+print(samples_list)
+
 # Specify target rules
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
         #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad',
         #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
-        out_file = data_dir + f'analyzed/{phenotyping_level}_samples_kontextual.tsv'
+        out_file = expand(output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv', sample='T23_004535_110005_1')
 
 
-#++++++++++++++++++++++++++++++++++++++++++ 1  +++++++++++++++++++++++++++++++++++++++++	
-# Perform cross type Ripley's L function analysis per cell
+#++++++++++++++++++++++++++++++++++++++++++ 1 PAIRWISE COMBINATIONS OF CELL TYPES OF INTEREST WITH CONTEXT INFORMATION +++++++++++++++++++++++++++++++++++++++++	
+# Get parent combinations
 #-------------------------------------------------------------------------------------------------------------------
 rule parent_combinations:
     input:
@@ -50,23 +55,60 @@ rule parent_combinations:
 
 
 
-#++++++++++++++++++++++++++++++++++++++++++ 2  +++++++++++++++++++++++++++++++++++++++++
+#++++++++++++++++++++++++++++++++++++++++++ 2 SAMPLE-WISE CALCULATION OF SPATIAL STATS +++++++++++++++++++++++++++++++++++++++++
 rule kontextual:
     input:
-        adata_in = adata_processed_path,
-        #adata_in = data_dir + f'adata_per_sample/{phenotyping_level}/{core}.h5ad',
+        adata_in=data_dir + f'adata_per_sample/{phenotyping_level}/{{sample}}.h5ad',
         parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
     output:
-        out_file = data_dir + f'analyzed/{phenotyping_level}_samples_kontextual.tsv',
+        out_file = output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv',
     params:
-        celltype_key = phenotyping_level,
+        celltype_key=phenotyping_level,
         coi = coi
-    threads:
-        20
     conda:
         "/appdata/users/P083831/conda_envs/r_statial"
     script:
-        "scripts/analysis_and_plotting/kontextual.R"
+        "scripts/analysis_and_plotting/kontextual_w_sim.R"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# rule kontextual:
+#     input:
+#         adata_in = adata_processed_path,
+#         #adata_in = data_dir + f'adata_per_sample/{phenotyping_level}/{core}.h5ad',
+#         parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
+#     output:
+#         out_file = data_dir + f'analyzed/{phenotyping_level}_samples_kontextual.tsv',
+#     params:
+#         celltype_key = phenotyping_level,
+#         coi = coi
+#     threads:
+#         1
+#     conda:
+#         "/appdata/users/P083831/conda_envs/r_statial"
+#     script:
+#         "scripts/analysis_and_plotting/kontextual.R"
     
 
 
