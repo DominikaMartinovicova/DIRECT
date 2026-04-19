@@ -10,7 +10,7 @@ configfile: "config.yaml"
 #-------------------------------------------------------------------------------------------------------------------
 data_dir = config["all"]["data_dir"]
 log_dir = config["all"]["log_dir"]
-phenotyping_level = config["phenotyping_level"]
+phenotyping_level = config["phenotyping_level"] 
 output_dir_results = config["all"]["output_dir_results"].format(phenotyping_level=phenotyping_level)
 output_dir_plots = config["all"]["output_dir_plots"].format(phenotyping_level=phenotyping_level)
 exclude_v17 = config["exclude_v17"]
@@ -35,8 +35,12 @@ rule all:
     input:
         #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad',
         #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
-        out_file = expand(output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv', sample='T23_004535_110005_1')
-
+        #out_file = expand(output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv', sample='T23_004535_110005_1')
+        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations_immune_split.csv',
+        kontextual_ripleys = expand(
+            output_dir_results + f'spatial/per_sample/{{sample}}/kontextual_ripleys/kontextual_ripleys_summary.tsv',
+            sample=samples_list
+        )
 
 #++++++++++++++++++++++++++++++++++++++++++ 1 PAIRWISE COMBINATIONS OF CELL TYPES OF INTEREST WITH CONTEXT INFORMATION +++++++++++++++++++++++++++++++++++++++++	
 # Get parent combinations
@@ -46,7 +50,7 @@ rule parent_combinations:
         #adata_in = adata_processed_path
         #adata_in = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_patch/Neutro_Epi_extImm_pooled_A_EM_N/200um_50um/patch_T23_004535_110005_1_window_25.h5ad'
     output:
-        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
+        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations_immune_split.csv'
     conda:
         "/appdata/users/P083831/conda_envs/r_statial"
     script:
@@ -56,75 +60,51 @@ rule parent_combinations:
 
 
 #++++++++++++++++++++++++++++++++++++++++++ 2 SAMPLE-WISE CALCULATION OF SPATIAL STATS +++++++++++++++++++++++++++++++++++++++++
-rule kontextual:
+rule kontextual_ripleys:
     input:
-        adata_in=data_dir + f'adata_per_sample/{phenotyping_level}/{{sample}}.h5ad',
-        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
+        adata_in = data_dir + f'adata_per_sample/{phenotyping_level}/{{sample}}.h5ad',
+        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations_immune_split.csv'
     output:
-        out_file = output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv',
+        summary = output_dir_results + f'spatial/per_sample/{{sample}}/kontextual_ripleys/kontextual_ripleys_summary.tsv',
+        pkl     = output_dir_results + f'spatial/per_sample/{{sample}}/kontextual_ripleys/kontextual_ripleys_L.pkl'
     params:
-        celltype_key=phenotyping_level,
-        coi = coi
+        output_dir = output_dir_results + f'spatial/per_sample/{{sample}}/kontextual_ripleys',
+        phen_level  = phenotyping_level,
+    log:
+        log_dir + f'kontextual_ripleys/{{sample}}.log'
     conda:
-        "/appdata/users/P083831/conda_envs/r_statial"
-    script:
-        "scripts/analysis_and_plotting/kontextual_w_sim.R"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        "/appdata/users/P083831/conda_envs/xenium_py310"
+    shell:
+        """
+        python3 scripts/analysis_and_plotting/kontextual_ripleys.py \
+            -i {input.adata_in} \
+            --parent_comb {input.parent_comb} \
+            --phen_level {params.phen_level} \
+            -o {params.output_dir} \
+            > {log} 2>&1
+        """
 
 
 # rule kontextual:
 #     input:
-#         adata_in = adata_processed_path,
-#         #adata_in = data_dir + f'adata_per_sample/{phenotyping_level}/{core}.h5ad',
+#         adata_in=data_dir + f'adata_per_sample/{phenotyping_level}/{{sample}}.h5ad',
 #         parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
 #     output:
-#         out_file = data_dir + f'analyzed/{phenotyping_level}_samples_kontextual.tsv',
+#         out_file = output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv',
 #     params:
-#         celltype_key = phenotyping_level,
+#         celltype_key=phenotyping_level,
 #         coi = coi
-#     threads:
-#         1
 #     conda:
 #         "/appdata/users/P083831/conda_envs/r_statial"
 #     script:
-#         "scripts/analysis_and_plotting/kontextual.R"
-    
+#         "scripts/analysis_and_plotting/kontextual_w_sim.R"
 
 
-# rule plot_kontextual:
-#     input:
-#         #adata_in = adata_processed_path,
-#         adata_in = data_dir + f'adata_per_sample/{phenotyping_level}/{core}.h5ad',
-#         parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations.csv'
-#     output:
-#         out_plot = output_dir_plots + f'spatial/per_sample/{core}/'
-#     params:
-#         celltype_key = phenotyping_level,
-#         coi = coi
-#     threads:
-#         20
-#     conda:
-#         "/appdata/users/P083831/conda_envs/r_statial"
-#     script:
-#         "scripts/analysis_and_plotting/plot_kontextual.R"
+
+
+
+
+
+
+
+

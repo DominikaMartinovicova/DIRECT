@@ -36,15 +36,18 @@ tumor_cells = c("Tumor_cells")
 
 lymphoid_cells = c(B_cells, T_cells, NK_cells)
 immune_cells = c(lymphoid_cells, myeloid_cells)
+non_immune_cells = c(tissue_cells, tumor_cells)
 non_malignant_cells = c(immune_cells, tissue_cells)
 malignant_cells = c(tumor_cells)
 
-all_cells = c(non_malignant_cells, malignant_cells)
+#all_cells = c(non_malignant_cells, malignant_cells)
+all_cells = c(immune_cells, non_immune_cells)
 
 # Create a data frame to store the parent combinations
 #--------------------------------------------------------------------------------
 print("Creating parent combinations...")
-parent_combinations <- parentCombinations(all = all_cells, malignant_cells, non_malignant_cells)
+#parent_combinations <- parentCombinations(all = all_cells, malignant_cells, non_malignant_cells)
+parent_combinations <- parentCombinations(all = all_cells, immune_cells, non_immune_cells)
 
 head(parent_combinations)
 
