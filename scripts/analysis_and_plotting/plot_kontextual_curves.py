@@ -43,22 +43,24 @@ import seaborn as sns
 PHENOTYPING_LEVEL = 'Neutro_Epi_extImm_pooled_A_EM_N'
 PATCH_SIZE        = '5000um_50um'
 
-RESULTS_BASE = (
+# --- per-sample mode ---------------------------------------------------------
+SAMPLE      = 'T23_004535_110005_1'
+SPLIT_TAG   = 'immune_split'          # added to all output filenames/dirs
+
+_SAMPLE_ROOT = (
     f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis/'
-    f'{PHENOTYPING_LEVEL}/spatial/per_patch/{PATCH_SIZE}'
-)
-PLOTS_BASE = (
-    f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/'
-    f'{PHENOTYPING_LEVEL}/spatial/per_patch/{PATCH_SIZE}/kontextual_curves'
+    f'{PHENOTYPING_LEVEL}/spatial/per_sample/{SAMPLE}'
 )
 
-# Root under which ALL per-patch pickle files are searched recursively.
-# Using the parent of RESULTS_BASE so patches organised with or without
-# a patch-size subdirectory are both discovered.
-_PER_PATCH_ROOT = (
-    f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis/'
-    f'{PHENOTYPING_LEVEL}/spatial/per_patch'
+RESULTS_BASE = _SAMPLE_ROOT   # kept for compatibility; not used for globbing
+
+PLOTS_BASE = (
+    f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/'
+    f'{PHENOTYPING_LEVEL}/spatial/per_sample/{SAMPLE}/kontextual_curves_{SPLIT_TAG}'
 )
+
+# For per-sample mode we search under the single sample directory only.
+_PER_PATCH_ROOT = _SAMPLE_ROOT
 
 COI = [
     "B_cell",
@@ -73,7 +75,7 @@ COI = [
     "Tumor_cells",
 ]
 
-RADII = np.array([25, 50, 75, 100, 150, 250], dtype=float)
+RADII = np.array([25, 50, 75, 100, 150, 200], dtype=float)  # per-sample radii
 
 SHORT_LABELS = {
     "B_cell":                          "B cell",
@@ -118,7 +120,7 @@ def _minpval(res, key):
 
 collected = {
     (ti, tj): {'obs_orig': [], 'sims_orig': [], 'obs_kont': [], 'sims_kont': [],
-               'scalars': []}
+               'scalars': [], 'parent_name': None, 'perm_pool_types': None}
     for ti in COI for tj in COI          # includes diagonal (ti == tj)
 }
 
@@ -159,6 +161,11 @@ for path in pkl_paths:
             'min_pval_kontextual': _minpval(res, 'pvalues_kontextual'),
         })
 
+        # Store parent pool metadata (same for all occurrences of this pair)
+        if collected[(ti, tj)]['parent_name'] is None:
+            collected[(ti, tj)]['parent_name']    = res.get('parent_name')
+            collected[(ti, tj)]['perm_pool_types'] = res.get('perm_pool_types')
+
 n_with_data = sum(
     1 for (ti, tj), v in collected.items()
     if (len(v['obs_orig']) > 0 or len(v['obs_kont']) > 0) and ti != tj
@@ -198,7 +205,12 @@ for pair, d in collected.items():
     a_orig = aggregate(d['obs_orig'], d['sims_orig'], n_r)
     a_kont = aggregate(d['obs_kont'], d['sims_kont'], n_r)
     if a_orig is not None or a_kont is not None:
-        agg[pair] = {'orig': a_orig, 'kont': a_kont}
+        agg[pair] = {
+            'orig': a_orig,
+            'kont': a_kont,
+            'parent_name':    d['parent_name'],
+            'perm_pool_types': d['perm_pool_types'],
+        }
 
 # =============================================================================
 # 3  Drawing helpers
@@ -272,18 +284,31 @@ def draw_combined(ax, da, show_sd=True, fontsize_legend=8):
 os.makedirs(os.path.join(PLOTS_BASE, 'per_pair'), exist_ok=True)
 
 for (ti, tj), da in agg.items():
-    fig, ax = plt.subplots(figsize=(5.5, 4.0))
+    fig, ax = plt.subplots(figsize=(5.5, 4.5))
     draw_combined(ax, da, show_sd=True, fontsize_legend=8)
 
     ax.set_xlabel('Radius (µm)', fontsize=10)
     ax.set_ylabel('L(r) − r', fontsize=10)
-    ax.set_title(f'{SHORT_LABELS[ti]} → {SHORT_LABELS[tj]}\n',
-                #  'Blue = original  |  Red = kontextual  |  '
-                #  'Solid = observed  |  Dashed = null mean  |  Shaded = envelopes',
-                 fontsize=9)
+
+    parent_name   = da.get('parent_name') or 'unknown'
+    pool_types    = da.get('perm_pool_types') or []
+    pool_str      = ', '.join(pool_types)
+
+    ax.set_title(
+        f'{SHORT_LABELS[ti]} → {SHORT_LABELS[tj]}\n'
+        f'Parent pool: {parent_name}',
+        fontsize=9,
+    )
+    # Pool members as a small footnote below the axes
+    fig.text(
+        0.5, -0.02,
+        f'Permuted within: {pool_str}',
+        ha='center', va='top', fontsize=6, color='#555555',
+        wrap=True, transform=fig.transFigure,
+    )
 
     plt.tight_layout()
-    fname = f'{ti}_to_{tj}.svg'
+    fname = f'{ti}_to_{tj}_{SPLIT_TAG}.svg'
     fig.savefig(os.path.join(PLOTS_BASE, 'per_pair', fname), bbox_inches='tight')
     plt.close(fig)
 
@@ -294,7 +319,9 @@ print(f"Per-pair SVGs saved to {os.path.join(PLOTS_BASE, 'per_pair')}")
 # =============================================================================
 n = len(COI)
 fig = plt.figure(figsize=(3.0 * n, 2.8 * n))
-gs  = gridspec.GridSpec(n, n, figure=fig, hspace=0.55, wspace=0.45)
+# left=0.10 reserves room for row-header text outside the tick-label area
+gs  = gridspec.GridSpec(n, n, figure=fig, hspace=0.55, wspace=0.45,
+                        left=0.10, right=0.98, bottom=0.03)
 
 for r_idx, ti in enumerate(COI):
     for c_idx, tj in enumerate(COI):
@@ -327,35 +354,71 @@ for r_idx, ti in enumerate(COI):
         ax.set_xticks(RADII)
         ax.tick_params(axis='both', labelsize=6)
 
+        # Annotate which parent pool was used
+        pname = agg[pair].get('parent_name') or ''
+        pool_label = 'imm' if pname == 'immune_cells' else 'non-imm'
+        ax.text(0.98, 0.98, pool_label,
+                ha='right', va='top', fontsize=5, color='#888888',
+                transform=ax.transAxes)
+
         if r_idx == n - 1:
             ax.set_xlabel('r (µm)', fontsize=7)
         if c_idx == 0:
             ax.set_ylabel('L(r) − r', fontsize=7)
 
-# Row and column headers
+# Row and column headers — positioned relative to actual axes extents
+fig.canvas.draw()
+
+col_header_top = 0.0   # track highest y of column-header text (figure coords)
 for i, ct in enumerate(COI):
+    # Column header: centred above each column (top row of subplots)
+    ax_col = fig.axes[i]                  # row 0, column i
+    pos = ax_col.get_position()
+    col_y = pos.y1 + 0.005
+    col_header_top = max(col_header_top, col_y)
     fig.text(
-        (i + 0.5) / n, 1.002,
+        pos.x0 + pos.width / 2, col_y,
         SHORT_LABELS[ct],
         ha='center', va='bottom', fontsize=9, fontweight='bold',
-        transform=fig.transFigure
+        transform=fig.transFigure,
     )
+    # Row header: placed to the left with enough clearance from tick labels
+    ax_row = fig.axes[i * n]              # row i, column 0
+    pos = ax_row.get_position()
     fig.text(
-        -0.002, 1.0 - (i + 0.5) / n,
+        pos.x0 - 0.022, pos.y0 + pos.height / 2,
         SHORT_LABELS[ct],
         ha='right', va='center', fontsize=9, fontweight='bold',
-        rotation=90, transform=fig.transFigure
+        rotation=90, transform=fig.transFigure,
     )
 
-fig.suptitle(
-    "Kontextual Ripley's L — source (rows) → target (cols)\n"
-    "L(r) − r  (0 = CSR)  |  "
-    "Blue: L original  |  Red: L kontextual  |  "
-    "Solid: observed mean  |  Dashed: null mean  |  Shaded: null 95% envelope",
-    fontsize=11, y=1.035
+# Build pool description for the figure note
+_immune_pool = next(
+    (v['perm_pool_types'] for v in agg.values() if v.get('parent_name') == 'immune_cells'),
+    []
+)
+_non_immune_pool = next(
+    (v['perm_pool_types'] for v in agg.values() if v.get('parent_name') == 'non_immune_cells'),
+    []
+)
+_pool_note = (
+    f"immune pool ({len(_immune_pool)}): {', '.join(_immune_pool)}  |  "
+    f"non-immune pool ({len(_non_immune_pool)}): {', '.join(_non_immune_pool)}"
 )
 
-grid_path = os.path.join(PLOTS_BASE, 'kontextual_L_grid.svg')
+# Suptitle placed just above the column headers (va='bottom' anchors y to the
+# bottom of the text block), so there is no gap between them.
+fig.suptitle(
+    f"Kontextual Ripley's L — {SAMPLE} — {SPLIT_TAG}\n"
+    "source (rows) → target (cols)  |  "
+    "Blue: L original  |  Red: L kontextual  |  "
+    "Solid: observed mean  |  Dashed: null mean  |  Shaded: null 95% envelope\n"
+    f"Cell label: imm = immune_cells parent  |  non-imm = non_immune_cells parent\n"
+    f"{_pool_note}",
+    fontsize=9, y=col_header_top + 0.01, va='bottom',
+)
+
+grid_path = os.path.join(PLOTS_BASE, f'kontextual_L_grid_{SPLIT_TAG}.svg')
 fig.savefig(grid_path, bbox_inches='tight')
 plt.close(fig)
 print(f"Grid plot saved → {grid_path}")
@@ -393,11 +456,12 @@ for stat, title, cmap, center in heatmap_specs:
     fig, ax = plt.subplots(figsize=(13, 11))
     sns.heatmap(mat, cmap=cmap, center=center, linewidths=0.3, ax=ax,
                 cbar_kws={"shrink": 0.8})
-    ax.set_title(title, fontsize=13)
-    ax.set_xlabel("Target cell type", fontsize=11)
-    ax.set_ylabel("Source cell type", fontsize=11)
+    ax.set_title(title, fontsize=18, pad=14)
+    ax.set_xlabel("Target cell type", fontsize=15)
+    ax.set_ylabel("Source cell type", fontsize=15)
+    ax.tick_params(axis='both', labelsize=13)
     plt.tight_layout()
-    svg_path = os.path.join(PLOTS_BASE, 'heatmaps', f"kontextual_{stat}.svg")
+    svg_path = os.path.join(PLOTS_BASE, 'heatmaps', f"kontextual_{stat}_{SPLIT_TAG}.svg")
     fig.savefig(svg_path, bbox_inches='tight')
     plt.close(fig)
     print(f"Heatmap saved  \u2192 {svg_path}")

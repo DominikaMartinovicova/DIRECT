@@ -36,7 +36,7 @@ rule all:
         #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad',
         #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
         #out_file = expand(output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv', sample='T23_004535_110005_1')
-        parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations_immune_split.csv',
+        #parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations_immune_split.csv',
         kontextual_ripleys = expand(
             output_dir_results + f'spatial/per_sample/{{sample}}/kontextual_ripleys/kontextual_ripleys_summary.tsv',
             sample=samples_list

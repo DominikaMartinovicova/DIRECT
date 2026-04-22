@@ -9,6 +9,7 @@ import numpy as np
 
 patch = 'T23_004535_110005_2_window_0'
 #patch = 'T24_041865_130004_3_window_0'
+#patch='T23_004535_110005_1_window_0'
 core = 'T23_004535_110005_1'
 overlap=50
 patch_size=5000
@@ -170,7 +171,7 @@ for i, ct in enumerate(unique_cts):
     adata.obs[tmp_key].cat.reorder_categories(["zother", ct]) #, inplace=True)
     
     # assign colors
-    adata.uns[f"{tmp_key}_colors"] = ["red", "lightgray"]
+    adata.uns[f"{tmp_key}_colors"] = ["green", "lightgray"]
     fig, ax = plt.subplots()
     # plot and save
     sq.pl.spatial_scatter(
@@ -190,7 +191,7 @@ for i, ct in enumerate(unique_cts):
     
     
     plt.savefig(
-        f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N_old/spatial/patching/5000um_50um/spatial_scatter_patch_{patch}_{ct}.png',
+        f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N_old/spatial/patching/5000um_50um/spatial_scatter_cores_one_ct/spatial_scatter_patch_{patch}_{ct}.png',
         bbox_inches='tight'
     )
     plt.close()
