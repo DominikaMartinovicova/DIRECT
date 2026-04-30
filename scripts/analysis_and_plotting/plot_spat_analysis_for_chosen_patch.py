@@ -7,9 +7,9 @@ import squidpy as sq
 import scanpy as sc
 import numpy as np
 
-patch = 'T23_004535_110005_2_window_0'
+#patch = 'T23_004535_110005_2_window_0'
 #patch = 'T24_041865_130004_3_window_0'
-#patch='T23_004535_110005_1_window_0'
+patch='T23_004535_110005_1_window_0'
 core = 'T23_004535_110005_1'
 overlap=50
 patch_size=5000
@@ -19,17 +19,17 @@ input_dir = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis
 # #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # # 2 Prepare data and run analysis
 # #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# centrality_scores=pd.read_csv(os.path.join(input_dir, 'centrality_scores.csv'), index_col=0)
-# print(centrality_scores)
-# # Plot centrality scores
-# y='closeness_centrality'
-# plt.figure(figsize=(8,6))
-# sns.barplot(data=centrality_scores, x=centrality_scores.index, y=y)
-# plt.title(f'Centrality Scores for Patch {patch}')
-# plt.xticks(rotation=90)
-# plt.tight_layout()
-# plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}/spatial/patching/{patch_size}um_{overlap}um/{patch}_{y}.png')
-# plt.close()
+centrality_scores=pd.read_csv(os.path.join(input_dir, 'centrality_scores.csv'), index_col=0)
+print(centrality_scores)
+# Plot centrality scores
+y='degree_centrality'
+plt.figure(figsize=(8,6))
+sns.barplot(data=centrality_scores, x=centrality_scores.index, y=y, color='gray')
+plt.title(f'Centrality Scores for Patch {patch}')
+plt.xticks(rotation=90)
+plt.tight_layout()
+plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/{patch}_{y}.png')
+plt.close()
 
 # nhood_enrichment_path = os.path.join(input_dir, 'neighbors_enrichment.pkl')
 # with open(nhood_enrichment_path, 'rb') as f:
@@ -153,52 +153,52 @@ input_dir = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis
 
 # plt.savefig(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}/spatial/patching/{patch_size}um_{overlap}um/cross_ripley_{type_i}_vs_{type_j}.png', bbox_inches='tight')
 
-# Plot one cell type in spatial
-#-----------------------------------------------
-adata = sc.read(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/patch_{patch}.h5ad')
-unique_cts = adata.obs[phenotyping_level].unique()
-for i, ct in enumerate(unique_cts):
-    tmp_key = f"{phenotyping_level}_{ct}"
+# # Plot one cell type in spatial
+# #-----------------------------------------------
+# adata = sc.read(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_patch/{phenotyping_level}/{patch_size}um_{overlap}um/patch_{patch}.h5ad')
+# unique_cts = adata.obs[phenotyping_level].unique()
+# for i, ct in enumerate(unique_cts):
+#     tmp_key = f"{phenotyping_level}_{ct}"
     
-    # convert to object to allow assignment of 'other'
-    adata.obs[tmp_key] = adata.obs[phenotyping_level].astype(str)
+#     # convert to object to allow assignment of 'other'
+#     adata.obs[tmp_key] = adata.obs[phenotyping_level].astype(str)
     
-    # assign all non-target cells to 'other'
-    adata.obs[tmp_key] = adata.obs[tmp_key].where(adata.obs[tmp_key] == ct, other="zother")
+#     # assign all non-target cells to 'other'
+#     adata.obs[tmp_key] = adata.obs[tmp_key].where(adata.obs[tmp_key] == ct, other="zother")
     
-    # convert back to categorical with ordered categories ['other', ct]
-    adata.obs[tmp_key] = adata.obs[tmp_key].astype("category")
-    adata.obs[tmp_key].cat.reorder_categories(["zother", ct]) #, inplace=True)
+#     # convert back to categorical with ordered categories ['other', ct]
+#     adata.obs[tmp_key] = adata.obs[tmp_key].astype("category")
+#     adata.obs[tmp_key].cat.reorder_categories(["zother", ct]) #, inplace=True)
     
-    # assign colors
-    adata.uns[f"{tmp_key}_colors"] = ["green", "lightgray"]
-    fig, ax = plt.subplots()
-    # plot and save
-    sq.pl.spatial_scatter(
-        adata,
-        color=tmp_key,
-        title=f"{ct}",
-        size=1, shape= None,figsize=(10,10), ax=ax)
+#     # assign colors
+#     adata.uns[f"{tmp_key}_colors"] = ["red", "lightgray"]
+#     fig, ax = plt.subplots()
+#     # plot and save
+#     sq.pl.spatial_scatter(
+#         adata,
+#         color=tmp_key,
+#         title=f"{ct}",
+#         size=1, shape= None,figsize=(10,10), ax=ax)
     
-    # # pick a reference cell
-    # cx, cy = adata.obsm["spatial"][0]
+#     # # pick a reference cell
+#     # cx, cy = adata.obsm["spatial"][0]
 
-    # radii = [25, 50, 75, 100, 250]  # in microns
+#     # radii = [25, 50, 75, 100, 250]  # in microns
 
-    # for r in radii:
-    #     circle = plt.Circle((cx, cy), r, fill=False, linewidth=2)
-    #     ax.add_patch(circle)   
+#     # for r in radii:
+#     #     circle = plt.Circle((cx, cy), r, fill=False, linewidth=2)
+#     #     ax.add_patch(circle)   
     
     
-    plt.savefig(
-        f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N_old/spatial/patching/5000um_50um/spatial_scatter_cores_one_ct/spatial_scatter_patch_{patch}_{ct}.png',
-        bbox_inches='tight'
-    )
-    plt.close()
+#     plt.savefig(
+#         f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N_old/spatial/patching/5000um_50um/spatial_scatter_cores_one_ct/spatial_scatter_patch_{patch}_{ct}.png',
+#         bbox_inches='tight'
+#     )
+#     plt.close()
     
-    # clean up
-    del adata.obs[tmp_key]
-    del adata.uns[f"{tmp_key}_colors"]
+#     # clean up
+#     del adata.obs[tmp_key]
+#     del adata.uns[f"{tmp_key}_colors"]
 
 
 

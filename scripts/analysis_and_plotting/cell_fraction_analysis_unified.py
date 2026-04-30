@@ -70,7 +70,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scanpy as sc
 from scipy.stats import wilcoxon, mannwhitneyu
+from statsmodels.stats.multitest import multipletests
 from statannotations.Annotator import Annotator
+import argparse as _ap
 
 warnings.filterwarnings("ignore")
 
@@ -135,6 +137,15 @@ def parse_args():
             'Statistical test for independent-samples comparisons (default: mannwhitneyu).\n'
             'Note: the line plot always uses wilcoxon (paired test) regardless of this setting.'))
     parser.add_argument(
+        '--correction', dest='correction', default='none',
+        choices=['none', 'fdr_bh', 'bonferroni'],
+        help=(
+            'Multiple testing correction applied across cell types within each comparison\n'
+            '(default: none):\n'
+            '  none        - raw p-values, no correction\n'
+            '  fdr_bh      - Benjamini-Hochberg false discovery rate\n'
+            '  bonferroni  - Bonferroni (conservative, controls FWER)'))
+    parser.add_argument(
         '--groupby_key', dest='groupby_key', default='T_number',
         help='obs column used to compute per-unit fractions (default: T_number)')
     parser.add_argument(
@@ -143,6 +154,14 @@ def parse_args():
             'Optional metadata columns to stratify analyses by\n'
             '(e.g. --categories MPR treatment). Each is run in addition\n'
             'to the unstratified analysis.'))
+    parser.add_argument(
+        '--cross_group_cols', dest='cross_group_cols', nargs='*', default=None,
+        help=(
+            'Additional obs columns to rotate as the primary group in box-only\n'
+            'comparisons [bvr mode] (e.g. --cross_group_cols MPR treatment).\n'
+            'For each column, box plots are produced with category=None and\n'
+            'category=sample_type. Fold change and line plots are not run\n'
+            'because these columns are not paired across samples.'))
     parser.add_argument(
         '--structure_cols', dest='structure_cols', nargs='+',
         default=['structure', 'structure_core'],
@@ -181,7 +200,7 @@ def compute_fractions(adata, groupby_key, phen_level):
     DataFrame with one row per unit, cell type columns (0–1 fractions),
     and any metadata columns that exist in adata.obs.
     """
-    meta_present = [m for m in _META_COLS if m in adata.obs.columns]
+    meta_present = [m for m in _META_COLS if m in adata.obs.columns and m != groupby_key]
     acc = {}
 
     for unit in adata.obs[groupby_key].dropna().unique():
@@ -200,9 +219,14 @@ def compute_fractions(adata, groupby_key, phen_level):
 def filter_v17(df, exclude_v17):
     """Remove v1.7 treatment scheme rows if requested."""
     if exclude_v17 and 'treatment_scheme' in df.columns:
-        before = len(df)
+        before_rows = len(df)
+        before_pts = df['pt_id'].nunique() if 'pt_id' in df.columns else None
         df = df[~df['treatment_scheme'].str.contains('v1.7', na=False)].copy()
-        print(f'  v1.7 exclusion: {before} -> {len(df)} rows')
+        after_pts = df['pt_id'].nunique() if 'pt_id' in df.columns else None
+        pt_str = (f', patients excluded: {before_pts - after_pts} '
+                  f'({before_pts} -> {after_pts})'
+                  if before_pts is not None else '')
+        print(f'  v1.7 exclusion: {before_rows} -> {len(df)} rows{pt_str}')
     return df
 
 
@@ -263,14 +287,19 @@ def get_immune_fractions(df, cell_type_list, preserve_cols):
 # 2  Statistical testing helpers
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def stat_testing_two_groups(df, cell_cols, stat_test, group, groups):
+def stat_testing_two_groups(df, cell_cols, stat_test, group, groups, correction='none'):
     """
-    Run stat_test between two groups for each cell type.
+    Run stat_test between two groups for each cell type, with optional
+    multiple testing correction across all cell types in this comparison.
+
+    Parameters
+    ----------
+    correction : str   'none', 'fdr_bh', or 'bonferroni'
 
     Returns
     -------
-    stat_df      : raw results DataFrame
-    stat_df_annot: formatted for statannotations.Annotator
+    stat_df      : raw results DataFrame (includes both raw and corrected p-values)
+    stat_df_annot: formatted for statannotations.Annotator (uses corrected p-values)
     """
     results = []
     for ct in cell_cols:
@@ -285,6 +314,13 @@ def stat_testing_two_groups(df, cell_cols, stat_test, group, groups):
         return pd.DataFrame(), pd.DataFrame()
 
     stat_df = pd.DataFrame(results)
+
+    if correction != 'none':
+        _, p_corrected, _, _ = multipletests(stat_df['p_value'], method=correction)
+        stat_df['p_value_raw'] = stat_df['p_value']
+        stat_df['p_value'] = p_corrected
+        stat_df['correction'] = correction
+
     stat_df_annot = (
         stat_df
         .rename(columns={'cell_type': 'variable', 'p_value': 'pval'})
@@ -310,14 +346,16 @@ def annotate_significant(ax, stat_df_annot, data, x, y, hue, alpha=0.05):
         print(f'  Warning: annotation failed ({e})')
 
 
-def save_stat_results(stat_df, output_dir, prefix, group, category, stat_test, immune, exclude_v17):
+def save_stat_results(stat_df, output_dir, prefix, group, category, stat_test, immune,
+                      exclude_v17, correction='none'):
     """Save statistical results DataFrame to CSV."""
     if stat_df.empty:
         return
     suffix = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
     imm = '_immune' if immune else ''
     cat = f'_{category}' if category else ''
-    fname = f'{prefix}{imm}_{group}{cat}_{stat_test.__name__}_{suffix}.csv'
+    corr = f'_{correction}' if correction != 'none' else ''
+    fname = f'{prefix}{imm}_{group}{cat}_{stat_test.__name__}{corr}_{suffix}.csv'
     fpath = os.path.join(output_dir, fname)
     stat_df.to_csv(fpath, index=False)
     print(f'  Stats: {fpath}')
@@ -327,11 +365,14 @@ def save_stat_results(stat_df, output_dir, prefix, group, category, stat_test, i
 # 3  Filename builder and shared plot utilities
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def build_plot_path(output_dir, prefix, group, category, stat_test, immune, exclude_v17):
+def build_plot_path(output_dir, prefix, group, category, stat_test, immune, exclude_v17,
+                    correction='none'):
     suffix = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
     imm = '_immune' if immune else ''
     cat = f'_{category}' if category else ''
-    return os.path.join(output_dir, f'{prefix}{imm}_{group}{cat}_{stat_test.__name__}_{suffix}.svg')
+    corr = f'_{correction}' if correction != 'none' else ''
+    return os.path.join(output_dir,
+                        f'{prefix}{imm}_{group}{cat}_{stat_test.__name__}{corr}_{suffix}.svg')
 
 
 def _save_and_close(fpath):
@@ -376,7 +417,7 @@ def _build_title(base, groups, category, stat_test, immune, exclude_v17):
 # ------------------------------------------------------------------------------
 def plot_box(df, cell_type_list, group, category, id_col,
              output_dir_plots, output_dir_results,
-             stat_test, immune, exclude_v17, key='Cell fraction'):
+             stat_test, immune, exclude_v17, correction='none', key='Cell fraction'):
     """
     Boxplot of cell type fractions, comparing two groups.
     Optionally faceted by category.
@@ -408,32 +449,37 @@ def plot_box(df, cell_type_list, group, category, id_col,
             subset_df = subdata[id_vars + avail_ct]
             subset_melt = subset_df.melt(id_vars=id_vars, value_vars=avail_ct,
                                           var_name='cell_type', value_name=key)
-        stat_df, stat_df_annot = stat_testing_two_groups(subset_df, avail_ct, stat_test, group, groups)
+        stat_df, stat_df_annot = stat_testing_two_groups(
+            subset_df, avail_ct, stat_test, group, groups, correction=correction)
         annotate_significant(ax, stat_df_annot, subset_melt, 'cell_type', key, group)
         if not stat_df.empty:
             save_stat_results(stat_df, output_dir_results, 'stats_box', group,
-                              category, stat_test, immune, exclude_v17)
+                              category, stat_test, immune, exclude_v17, correction=correction)
 
     title = _build_title('Cell fractions', groups, category, stat_test, immune, exclude_v17)
     _set_labels_and_title(g, avail_ct, title, key, legend_title=group, use_catplot=True)
-    fpath = build_plot_path(output_dir_plots, 'cf_box', group, category, stat_test, immune, exclude_v17)
+    fpath = build_plot_path(output_dir_plots, 'cf_box', group, category, stat_test, immune,
+                            exclude_v17, correction=correction)
     _save_and_close(fpath)
 
 
 # ------------------------------------------------------------------------------
 def plot_line(df, cell_type_list, group, category, id_col,
               output_dir_plots, output_dir_results,
-              stat_test, immune, exclude_v17, key='Cell fraction'):
+              stat_test, immune, exclude_v17, correction='none', key='Cell fraction'):
     """
     Stripplot with lines connecting paired samples per patient (id_col groups).
-    Blue lines = increase, red lines = decrease between groups.
+    Red lines = increase, blue lines = decrease between groups.
     """
     groups = sorted([g for g in df[group].dropna().unique() if not str(g).isdigit()])
     if len(groups) < 2:
         print(f'  [skip line] fewer than 2 groups in "{group}": {groups}')
         return
 
-    id_vars = [id_col, group] + ([category] if category else [])
+    # pt_id is needed to pair Biopsy/Resection T_numbers for the same patient
+    pair_col = 'pt_id'
+    id_vars = [id_col, pair_col, group] + ([category] if category else [])
+    id_vars = [c for c in id_vars if c in df.columns]  # drop any absent columns
     avail_ct = [ct for ct in cell_type_list if ct in df.columns]
     melt = df[id_vars + avail_ct].melt(id_vars=id_vars, var_name='cell_type', value_name=key)
     col_order = sorted([g for g in df[category].dropna().unique()
@@ -457,10 +503,11 @@ def plot_line(df, cell_type_list, group, category, id_col,
             subset_melt = subset_df.melt(id_vars=id_vars, value_vars=avail_ct,
                                           var_name='cell_type', value_name=key)
 
-        # Draw connecting lines between paired observations
+        # Draw lines connecting the Biopsy and Resection T_numbers of the same patient.
+        # Blue = increase (resection > biopsy), red = decrease (resection < biopsy).
         for i, cell in enumerate(avail_ct):
             cell_data = subset_melt[subset_melt['cell_type'] == cell]
-            for pt, pt_df in cell_data.groupby(id_col):
+            for pt, pt_df in cell_data.groupby(pair_col):
                 pt_df = pt_df.set_index(group)
                 if groups[0] not in pt_df.index or groups[1] not in pt_df.index:
                     continue
@@ -470,22 +517,24 @@ def plot_line(df, cell_type_list, group, category, id_col,
                 ax.plot([i + offsets[0], i + offsets[1]], [y1, y2],
                         color=color, alpha=0.6, linewidth=1)
 
-        stat_df, stat_df_annot = stat_testing_two_groups(subset_df, avail_ct, stat_test, group, groups)
+        stat_df, stat_df_annot = stat_testing_two_groups(
+            subset_df, avail_ct, stat_test, group, groups, correction=correction)
         annotate_significant(ax, stat_df_annot, subset_melt, 'cell_type', key, group)
         if not stat_df.empty:
             save_stat_results(stat_df, output_dir_results, 'stats_line', group,
-                              category, stat_test, immune, exclude_v17)
+                              category, stat_test, immune, exclude_v17, correction=correction)
 
     title = _build_title('Cell fractions (paired)', groups, category, stat_test, immune, exclude_v17)
     _set_labels_and_title(g, avail_ct, title, key, legend_title=group, use_catplot=True)
-    fpath = build_plot_path(output_dir_plots, 'cf_line', group, category, stat_test, immune, exclude_v17)
+    fpath = build_plot_path(output_dir_plots, 'cf_line', group, category, stat_test, immune,
+                            exclude_v17, correction=correction)
     _save_and_close(fpath)
 
 
 # ------------------------------------------------------------------------------
 def plot_foldchange(df, cell_type_list, group, category,
                     output_dir_plots, output_dir_results,
-                    stat_test, immune, exclude_v17, key='Cell fraction'):
+                    stat_test, immune, exclude_v17, correction='none', key='Cell fraction'):
     """
     Log2 fold change boxplot: log2(group[1] / group[0]) per patient.
     df must already be aggregated to one row per (pt_id, group).
@@ -521,13 +570,13 @@ def plot_foldchange(df, cell_type_list, group, category,
         cat_order = sorted(fc_melt[category].dropna().unique())
         ax = sns.boxplot(data=fc_melt, x='cell_type', y=key, hue=category,
                          hue_order=cat_order, palette='tab20')
-        # Compare between categories (independent samples)
-        stat_df, stat_df_annot = stat_testing_two_groups(
-            fc_df, avail_ct, stat_test, category, cat_order[:2])
-        annotate_significant(ax, stat_df_annot, fc_melt, 'cell_type', key, category)
-        if not stat_df.empty:
-            save_stat_results(stat_df, output_dir_results, 'stats_foldchange', group,
-                              category, stat_test, immune, exclude_v17)
+        if len(cat_order) >= 2:
+            stat_df, stat_df_annot = stat_testing_two_groups(
+                fc_df, avail_ct, stat_test, category, cat_order[:2], correction=correction)
+            annotate_significant(ax, stat_df_annot, fc_melt, 'cell_type', key, category)
+            if not stat_df.empty:
+                save_stat_results(stat_df, output_dir_results, 'stats_foldchange', group,
+                                  category, stat_test, immune, exclude_v17, correction=correction)
 
     plt.axhline(y=0, color='red', linestyle='--', linewidth=1)
 
@@ -542,14 +591,15 @@ def plot_foldchange(df, cell_type_list, group, category,
     plt.xticks(rotation=45, ha='right')
     plt.xlabel('Cell type')
     plt.ylabel(f'Log2 FC ({groups[1]} / {groups[0]})')
-    fpath = build_plot_path(output_dir_plots, 'cf_fc_box', group, category, stat_test, immune, exclude_v17)
+    fpath = build_plot_path(output_dir_plots, 'cf_fc_box', group, category, stat_test, immune,
+                            exclude_v17, correction=correction)
     _save_and_close(fpath)
 
 
 # ------------------------------------------------------------------------------
 def plot_shift(df, cell_type_list, group, category,
                output_dir_plots, output_dir_results,
-               stat_test, immune, exclude_v17, key='Cell fraction'):
+               stat_test, immune, exclude_v17, correction='none', key='Cell fraction'):
     """
     Absolute difference boxplot: group[1] - group[0] per patient.
     df must already be aggregated to one row per (pt_id, group).
@@ -585,11 +635,11 @@ def plot_shift(df, cell_type_list, group, category,
                                               categories=cat_order, ordered=True)
         ax = sns.boxplot(data=diff_melt, x='cell_type', y=key, hue=category, palette='tab20')
         stat_df, stat_df_annot = stat_testing_two_groups(
-            diff_df, avail_ct, stat_test, category, cat_order[:2])
+            diff_df, avail_ct, stat_test, category, cat_order[:2], correction=correction)
         annotate_significant(ax, stat_df_annot, diff_melt, 'cell_type', key, category)
         if not stat_df.empty:
             save_stat_results(stat_df, output_dir_results, 'stats_shift', group,
-                              category, stat_test, immune, exclude_v17)
+                              category, stat_test, immune, exclude_v17, correction=correction)
 
     plt.axhline(y=0, color='red', linestyle='--', linewidth=1)
 
@@ -604,14 +654,15 @@ def plot_shift(df, cell_type_list, group, category,
     plt.xticks(rotation=45, ha='right')
     plt.xlabel('Cell type')
     plt.ylabel(f'Fraction shift ({groups[1]} - {groups[0]})')
-    fpath = build_plot_path(output_dir_plots, 'cf_shift_box', group, category, stat_test, immune, exclude_v17)
+    fpath = build_plot_path(output_dir_plots, 'cf_shift_box', group, category, stat_test, immune,
+                            exclude_v17, correction=correction)
     _save_and_close(fpath)
 
 
 # ------------------------------------------------------------------------------
 def plot_composition(df, cell_type_list, group, category,
                      output_dir_plots, output_dir_results,
-                     stat_test, immune, exclude_v17, key='Cell fraction'):
+                     stat_test, immune, exclude_v17, correction='none', key='Cell fraction'):
     """
     Composition boxplot: raw fractions across all samples per group.
     No pairing required.
@@ -629,11 +680,12 @@ def plot_composition(df, cell_type_list, group, category,
         plt.figure(figsize=(12, 6))
         ax = sns.boxplot(data=melt, x='cell_type', y=key, hue=group,
                          hue_order=groups, palette='tab20', fill=True)
-        stat_df, stat_df_annot = stat_testing_two_groups(df, avail_ct, stat_test, group, groups)
+        stat_df, stat_df_annot = stat_testing_two_groups(
+            df, avail_ct, stat_test, group, groups, correction=correction)
         annotate_significant(ax, stat_df_annot, melt, 'cell_type', key, group)
         if not stat_df.empty:
             save_stat_results(stat_df, output_dir_results, 'stats_composition', group,
-                              category, stat_test, immune, exclude_v17)
+                              category, stat_test, immune, exclude_v17, correction=correction)
         title = _build_title('Cell fraction composition', groups, category, stat_test, immune, exclude_v17)
         plt.title(title)
         plt.xticks(rotation=45, ha='right')
@@ -641,7 +693,7 @@ def plot_composition(df, cell_type_list, group, category,
         plt.ylabel(key)
         plt.legend(title=group, loc='upper right')
         fpath = build_plot_path(output_dir_plots, 'cf_composition_box', group, category,
-                                stat_test, immune, exclude_v17)
+                                stat_test, immune, exclude_v17, correction=correction)
         _save_and_close(fpath)
 
         # Also save a zoomed-in version
@@ -665,20 +717,21 @@ def plot_composition(df, cell_type_list, group, category,
                         kind='box', palette='tab20', height=6, aspect=1.5)
         for ax, (_, subdata) in zip(g.axes.flat, g.facet_data()):
             subset_df = subdata.pivot(index=id_vars, columns='cell_type', values=key).reset_index()
-            stat_df, stat_df_annot = stat_testing_two_groups(subset_df, avail_ct, stat_test, group, groups)
+            stat_df, stat_df_annot = stat_testing_two_groups(
+                subset_df, avail_ct, stat_test, group, groups, correction=correction)
             annotate_significant(ax, stat_df_annot, subdata, 'cell_type', key, group)
 
         title = _build_title('Cell fraction composition', groups, category, stat_test, immune, exclude_v17)
         _set_labels_and_title(g, avail_ct, title, key, legend_title=group, use_catplot=True)
         fpath = build_plot_path(output_dir_plots, 'cf_composition_box', group, category,
-                                stat_test, immune, exclude_v17)
+                                stat_test, immune, exclude_v17, correction=correction)
         _save_and_close(fpath)
 
 
 # ------------------------------------------------------------------------------
 def plot_within_sampletype(df, cell_type_list, group, category,
                            output_dir_plots, output_dir_results,
-                           stat_test, immune, exclude_v17, key='Cell fraction'):
+                           stat_test, immune, exclude_v17, correction='none', key='Cell fraction'):
     """
     For each value of `group` (e.g. Biopsy, Resection), plot cell type fractions
     split by `category` (e.g. MPR). This answers: within Resection samples, do
@@ -708,14 +761,15 @@ def plot_within_sampletype(df, cell_type_list, group, category,
                          hue_order=cat_vals, palette='tab20')
 
         stat_df, stat_df_annot = stat_testing_two_groups(
-            sub, avail_ct, stat_test, category, cat_vals[:2])
+            sub, avail_ct, stat_test, category, cat_vals[:2], correction=correction)
         annotate_significant(ax, stat_df_annot, melt, 'cell_type', key, category)
         if not stat_df.empty:
             save_stat_results(stat_df, output_dir_results, f'stats_within_{sample_val}',
-                              category, None, stat_test, immune, exclude_v17)
+                              category, None, stat_test, immune, exclude_v17, correction=correction)
 
         suffix = 'wo_v1.7' if exclude_v17 else 'w_v1.7'
         imm = '_immune' if immune else ''
+        corr = f'_{correction}' if correction != 'none' else ''
         title = f'{"Immune " if immune else ""}Cell fractions in {sample_val} | split by {category}'
         if exclude_v17:
             title += ' (excl. v1.7)'
@@ -726,7 +780,7 @@ def plot_within_sampletype(df, cell_type_list, group, category,
         plt.ylabel(key)
         plt.legend(title=category, loc='upper right')
 
-        fname = f'cf_within_{sample_val}{imm}_{category}_{stat_test.__name__}_{suffix}.svg'
+        fname = f'cf_within_{sample_val}{imm}_{category}_{stat_test.__name__}{corr}_{suffix}.svg'
         fpath = os.path.join(output_dir_plots, fname)
         _save_and_close(fpath)
 
@@ -769,7 +823,7 @@ _PAIRED_PLOTS = {'line'}
 
 def _run_plots(df, df_pt, cell_type_list, group, categories, id_col,
                plot_types, output_dir_plots, output_dir_results,
-               stat_test, immune, exclude_v17, mode_label=''):
+               stat_test, immune, exclude_v17, correction='none', mode_label=''):
     """
     Dispatch selected plot types for all category combinations.
 
@@ -777,6 +831,7 @@ def _run_plots(df, df_pt, cell_type_list, group, categories, id_col,
     df_pt  : row-per-patient data (averaged) for foldchange/shift
     stat_test : default statistical test (used for all plots except line,
                 which always uses wilcoxon because it shows paired data)
+    correction : multiple testing correction method ('none', 'fdr_bh', 'bonferroni')
     """
     print(f'\n  --- {mode_label} | immune={immune} ---')
     for ptype in plot_types:
@@ -797,6 +852,7 @@ def _run_plots(df, df_pt, cell_type_list, group, categories, id_col,
                 stat_test=effective_stat_test,
                 immune=immune,
                 exclude_v17=exclude_v17,
+                correction=correction,
             )
             if ptype in {'box', 'line'}:
                 kwargs['id_col'] = id_col
@@ -810,7 +866,9 @@ def run_bvr_analysis(fractions_df, cell_type_list, args):
     """
     print('\n======  Biopsy vs Resection  ======')
     group = 'sample_type'
-    id_col = args.groupby_key
+    # BVR fractions are always computed at T_number level when T_number is available.
+    # Use T_number as id_col if present; fall back to args.groupby_key.
+    id_col = 'T_number' if 'T_number' in fractions_df.columns else args.groupby_key
     categories = [None] + (args.categories or [])
     plot_types = args.plot_types
     stat_test = wilcoxon if args.stat_test == 'wilcoxon' else mannwhitneyu
@@ -838,11 +896,12 @@ def run_bvr_analysis(fractions_df, cell_type_list, args):
         stat_test=stat_test,
         immune=False,
         exclude_v17=args.exclude_v17,
+        correction=args.correction,
         mode_label='All cell types',
     )
 
     # -- Immune cell types only --
-    preserve_meta = ['pt_id', group] + (args.categories or [])
+    preserve_meta = list(dict.fromkeys(['pt_id', id_col, group] + (args.categories or [])))
     df_immune, immune_ct_list = get_immune_fractions(paired_df, cell_type_list, preserve_meta)
     if df_immune is not None and immune_ct_list:
         df_immune_pt = aggregate_per_patient(df_immune, group, immune_ct_list)
@@ -859,8 +918,67 @@ def run_bvr_analysis(fractions_df, cell_type_list, args):
             stat_test=stat_test,
             immune=True,
             exclude_v17=args.exclude_v17,
+            correction=args.correction,
             mode_label='Immune cell types only',
         )
+
+    # All comparison columns: sample_type + categories + cross_group_cols (deduplicated).
+    # Used to generate all pairwise (group, category) combinations.
+    all_comp_cols = list(dict.fromkeys(
+        ['sample_type'] + (args.categories or []) + (args.cross_group_cols or [])
+    ))
+
+    # -- Cross-group box plots: rotate MPR / treatment / etc. as primary group --
+    # For each cross_group_col, box plots are produced with category=None and
+    # category=sample_type. fc/line are skipped because these columns are not paired.
+    if args.cross_group_cols:
+        print('\n======  Cross-group box comparisons  ======')
+        for cross_col in args.cross_group_cols:
+            if cross_col not in df.columns:
+                print(f'  Warning: "{cross_col}" not in data, skipping.')
+                continue
+            cross_categories = [None] + [c for c in all_comp_cols if c != cross_col]
+            print(f'\n  Group: {cross_col}')
+
+            # All cell types
+            _run_plots(
+                df=df,
+                df_pt=df,
+                cell_type_list=cell_type_list,
+                group=cross_col,
+                categories=cross_categories,
+                id_col=id_col,
+                plot_types=['box'],
+                output_dir_plots=args.output_dir_plots,
+                output_dir_results=args.output_dir_results,
+                stat_test=stat_test,
+                immune=False,
+                exclude_v17=args.exclude_v17,
+                correction=args.correction,
+                mode_label=f'All cell types | group={cross_col}',
+            )
+
+            # Immune cell types only
+            cross_preserve = list(dict.fromkeys(['pt_id', id_col, cross_col] + all_comp_cols))
+            df_imm_cross, imm_ct_cross = get_immune_fractions(df, cell_type_list, cross_preserve)
+            if df_imm_cross is not None and imm_ct_cross:
+                _run_plots(
+                    df=df_imm_cross,
+                    df_pt=df_imm_cross,
+                    cell_type_list=imm_ct_cross,
+                    group=cross_col,
+                    categories=cross_categories,
+                    id_col=id_col,
+                    plot_types=['box'],
+                    output_dir_plots=args.output_dir_plots,
+                    output_dir_results=args.output_dir_results,
+                    stat_test=stat_test,
+                    immune=True,
+                    exclude_v17=args.exclude_v17,
+                    correction=args.correction,
+                    mode_label=f'Immune cell types | group={cross_col}',
+                )
+
 
 
 def run_structure_analysis(fractions_df, cell_type_list, args):
@@ -909,6 +1027,7 @@ def run_structure_analysis(fractions_df, cell_type_list, args):
             stat_test=stat_test,
             immune=False,
             exclude_v17=args.exclude_v17,
+            correction=args.correction,
             mode_label=f'All cell types | {structure_col}',
         )
 
@@ -921,7 +1040,8 @@ def run_structure_analysis(fractions_df, cell_type_list, args):
                          output_dir_plots=args.output_dir_plots,
                          output_dir_results=args.output_dir_results,
                          stat_test=stat_test, immune=False,
-                         exclude_v17=args.exclude_v17)
+                         exclude_v17=args.exclude_v17,
+                         correction=args.correction)
 
         # -- Immune cell types only --
         preserve_meta = ['pt_id', structure_col] + (args.categories or [])
@@ -940,6 +1060,7 @@ def run_structure_analysis(fractions_df, cell_type_list, args):
                 stat_test=stat_test,
                 immune=True,
                 exclude_v17=args.exclude_v17,
+                correction=args.correction,
                 mode_label=f'Immune cell types | {structure_col}',
             )
 
@@ -949,8 +1070,33 @@ def run_structure_analysis(fractions_df, cell_type_list, args):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 def main():
-    args = parse_args()
+    # -------------------------------------------------------------------------
+    # HARDCODED ARGUMENTS — edit here to run without typing CLI flags.
+    # Comment out the parse_args() line below and uncomment this block.
+    # -------------------------------------------------------------------------
+    args = _ap.Namespace(
+        input        = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/Neutro_Epi_extImm_pooled_A_EM_N_combined_adatas_for_analysis_w_v1.7.h5ad',
+        phen_level   = 'Neutro_Epi_extImm_pooled_A_EM_N',
+        celltype_list= '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/combined/Neutro_Epi_extImm_pooled_A_EM_N_celltype_list.txt',
+        groupby_key  = 'T_number',
+        analysis_mode= 'bvr',            # 'bvr' | 'structure' | 'both'
+        plot_types   = ['box', 'foldchange', 'line'],
+        stat_test    = 'mannwhitneyu',   # 'mannwhitneyu' | 'wilcoxon'
+        correction   = 'none',           # 'none' | 'fdr_bh' | 'bonferroni'
+        categories   = ['MPR', 'treatment'],  # list of obs columns, or None
+        cross_group_cols = ['MPR', 'treatment'],  # rotate as group in box-only; or None
+        structure_cols = ['structure', 'structure_core'],
+        exclude_v17  = True,
+        exclude_core3= False,
+        output_dir_plots  = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/celltype_fractions/',
+        output_dir_results= '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/analysis/Neutro_Epi_extImm_pooled_A_EM_N/celltype_fractions/ ',
+    )
+    # -------------------------------------------------------------------------
+    #args = parse_args()
 
+    v17_suffix = 'wo_v1.7' if args.exclude_v17 else 'w_v1.7'
+    args.output_dir_plots   = os.path.join(args.output_dir_plots,   v17_suffix)
+    args.output_dir_results = os.path.join(args.output_dir_results, v17_suffix)
     os.makedirs(args.output_dir_plots, exist_ok=True)
     os.makedirs(args.output_dir_results, exist_ok=True)
     sns.set_style('whitegrid')
@@ -965,8 +1111,10 @@ def main():
     print(f'  Analysis mode:   {args.analysis_mode}')
     print(f'  Plot types:      {args.plot_types}')
     print(f'  Categories:      {args.categories}')
+    print(f'  Cross-group:     {args.cross_group_cols}')
     print(f'  Exclude v1.7:    {args.exclude_v17}')
     print(f'  Stat test:       {args.stat_test} (line plot always uses wilcoxon)')
+    print(f'  MT correction:   {args.correction}')
     if args.analysis_mode in ('structure', 'both'):
         print(f'  Structure cols:  {args.structure_cols}')
     print(f'  Output plots:    {args.output_dir_plots}')
@@ -987,19 +1135,25 @@ def main():
         adata = adata[adata.obs['structure_core'] != 'core_3', :]
         print(f'  Excluded core_3: {before} -> {adata.n_obs} cells')
 
-    # Compute fractions
-    print(f'\nComputing fractions per {args.groupby_key}...')
-    fractions_df = compute_fractions(adata, args.groupby_key, args.phen_level)
-    print(f'  Fractions dataframe: {fractions_df.shape}')
+    # BVR: pool all cells per T_number to avoid bias from unequal core sizes.
+    # Structure: keep per-unit (args.groupby_key) fractions so cores are compared individually.
+    if args.analysis_mode in ('bvr', 'both'):
+        bvr_key = 'T_number' if 'T_number' in adata.obs.columns else args.groupby_key
+        print(f'\nComputing fractions per {bvr_key} (BVR mode)...')
+        fractions_bvr = compute_fractions(adata, bvr_key, args.phen_level)
+        print(f'  BVR fractions dataframe: {fractions_bvr.shape}')
+
+    if args.analysis_mode in ('structure', 'both'):
+        print(f'\nComputing fractions per {args.groupby_key} (structure mode)...')
+        fractions_struct = compute_fractions(adata, args.groupby_key, args.phen_level)
+        print(f'  Structure fractions dataframe: {fractions_struct.shape}')
 
     # Run selected analyses
     if args.analysis_mode in ('bvr', 'both'):
-        run_bvr_analysis(fractions_df, cell_type_list, args)
+        run_bvr_analysis(fractions_bvr, cell_type_list, args)
 
     if args.analysis_mode in ('structure', 'both'):
-        if args.groupby_key != 'sample':
-            print('\n  Note: structure mode is typically run with --groupby_key sample.')
-        run_structure_analysis(fractions_df, cell_type_list, args)
+        run_structure_analysis(fractions_struct, cell_type_list, args)
 
     print('\nDone.')
 

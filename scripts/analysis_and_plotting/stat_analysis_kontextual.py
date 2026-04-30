@@ -106,13 +106,14 @@ VALID_COLS = ['MPR', 'sample_type', 'treatment']
 # combinations_to_run = [(args.compare_col, args.split_col)]
 
 # --- Hardcoded parameters (comment out and uncomment argparse block above to use CLI) ---
+
 _BASE = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT'
 input_dir          = f'{_BASE}/results/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/per_sample'
 metadata_path      = f'{_BASE}/data/adata_per_sample/Neutro_Epi_extImm_pooled_A_EM_N/samples_metadata.csv'
-adata_path         = f'{_BASE}/data/combined/Neutro_Epi_extImm_pooled_A_EM_N_combined_adatas_for_analysis_w_v1.7.h5ad'
+adata_path         = (f'{_BASE}/data/combined/Neutro_Epi_extImm_pooled_A_EM_N_combined_adatas_for_analysis_w_v1.7.h5ad')
 groups_arg         = None           # e.g. ['<90', '>=90'] or None to auto-detect per combination
-sample_type_filter = 'Resection'    # 'Resection' | 'Biopsy' | 'both' | None
-exclude_v17        = False
+exclude_v17        = True
+sample_type_filter = None    # 'Resection' | 'Biopsy' | 'both' | None
 output_dir_results = f'{_BASE}/results/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/kontextual/Tnumber'
 output_dir_plots   = f'{_BASE}/plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/kontextual/Tnumber'
 combinations_to_run = [
@@ -243,29 +244,61 @@ def run_stats(df, compare_col, groups):
 def plot_volcano(stat_df, groups, compare_col, title, out_path):
     if stat_df.empty:
         return
-    fig, ax = plt.subplots(figsize=(10, 7))
-    colors = ['red' if sig else 'grey' for sig in stat_df['significant']]
-    ax.scatter(
-        stat_df['median_diff'],
-        -np.log10(stat_df['p_adj'].clip(lower=1e-10)),
-        c=colors, alpha=0.7, s=40, linewidths=0)
-    ax.axhline(-np.log10(0.05), color='black', linestyle='--', linewidth=0.8, alpha=0.6)
-    ax.axvline(0,               color='black', linestyle='--', linewidth=0.8, alpha=0.6)
-    for _, row in stat_df[stat_df['significant']].iterrows():
-        ax.annotate(
-            row['cell_pair'].replace('__', '\n→ '),
-            xy=(row['median_diff'], -np.log10(max(row['p_adj'], 1e-10))),
-            fontsize=6, ha='center', va='bottom',
-            xytext=(0, 4), textcoords='offset points')
-    ax.set_xlabel(f'Median {compare_col}: {groups[1]} − {groups[0]}', fontsize=11)
-    ax.set_ylabel('-log10(FDR-adjusted p-value)', fontsize=11)
-    ax.set_title(title, fontsize=11)
+    plot_df = stat_df.dropna(subset=['median_diff'])
+    if plot_df.empty:
+        return
+
+    y_vals      = -np.log10(plot_df['p_adj'].clip(lower=1e-10))
+    sig_threshold = -np.log10(0.05)
+    near_thresh = (~plot_df['significant']) & y_vals.between(1, sig_threshold)
+    colors = [
+        'red'    if sig else
+        'orange' if near else
+        'grey'
+        for sig, near in zip(plot_df['significant'], near_thresh)
+    ]
+    sig_df  = plot_df[plot_df['significant']]
+    near_df = plot_df[near_thresh]
+    xlabel  = f'Median diff ({compare_col}): {groups[1]} − {groups[0]}'
+    ylabel  = '-log10(FDR-adjusted p-value)'
+
+    fig, (ax_lin, ax_log) = plt.subplots(1, 2, figsize=(18, 7), sharey=True)
+
+    for ax, log_scale in ((ax_lin, False), (ax_log, True)):
+        ax.scatter(plot_df['median_diff'], y_vals,
+                   c=colors, alpha=0.7, s=40, linewidths=0)
+        ax.axhline(-np.log10(0.05), color='black', linestyle='--', linewidth=0.8, alpha=0.6)
+        ax.axvline(0,               color='black', linestyle='--', linewidth=0.8, alpha=0.6)
+        for _, row in sig_df.iterrows():
+            ax.annotate(
+                row['cell_pair'].replace('__', '\n→ '),
+                xy=(row['median_diff'], -np.log10(max(row['p_adj'], 1e-10))),
+                fontsize=9, ha='center', va='bottom',
+                xytext=(0, 4), textcoords='offset points')
+        for _, row in near_df.iterrows():
+            ax.annotate(
+                row['cell_pair'].replace('__', '\n→ '),
+                xy=(row['median_diff'], -np.log10(max(row['p_adj'], 1e-10))),
+                fontsize=8, ha='center', va='bottom',
+                xytext=(0, 4), textcoords='offset points')
+        if log_scale:
+            # symlog handles values that cross zero; linthresh sets the linear region width
+            linthresh = max(1.0, np.abs(plot_df['median_diff']).quantile(0.05))
+            ax.set_xscale('symlog', linthresh=linthresh)
+            ax.set_xlabel(f'{xlabel} [symlog scale]', fontsize=13)
+        else:
+            ax.set_xlabel(xlabel, fontsize=13)
+        ax.set_ylabel(ylabel, fontsize=13)
+
+
+    ax_lin.set_title(f'{title}\n(linear x)', fontsize=12)
+    ax_log.set_title(f'{title}\n(symlog x)', fontsize=12)
     plt.tight_layout()
     plt.savefig(out_path, format='svg', bbox_inches='tight')
     plt.close()
 
 
-def plot_heatmap(patient_sub, groups, compare_col, title, out_path):
+def plot_heatmap(patient_sub, groups, compare_col, title, out_path, row_order=None):
     if patient_sub.empty:
         return
     heatmap_data = (patient_sub
@@ -273,11 +306,10 @@ def plot_heatmap(patient_sub, groups, compare_col, title, out_path):
                     .median()
                     .unstack(compare_col))
     heatmap_data = heatmap_data[[c for c in groups if c in heatmap_data.columns]]
-    if len(heatmap_data.columns) == 2:
-        g1, g2 = heatmap_data.columns[0], heatmap_data.columns[1]
-        heatmap_data = heatmap_data.assign(
-            _diff=heatmap_data[g2] - heatmap_data[g1]
-        ).sort_values('_diff').drop(columns='_diff')
+    if row_order is not None:
+        heatmap_data = heatmap_data.reindex(row_order)
+    else:
+        heatmap_data = heatmap_data.sort_index()
     vmax = heatmap_data.abs().quantile(0.95).max()
     fig, ax = plt.subplots(figsize=(4, max(6, len(heatmap_data) * 0.28)))
     sns.heatmap(
@@ -292,11 +324,55 @@ def plot_heatmap(patient_sub, groups, compare_col, title, out_path):
     plt.close()
 
 
+def plot_combined_heatmap(patient_df, split_levels, split_col, groups, compare_col,
+                          title, out_path, row_order=None):
+    "Single heatmap with columns grouped by split level: [sv1_g1, sv1_g2, sv2_g1, sv2_g2, ...]."
+    parts = []
+    for sv in split_levels:
+        sub = (patient_df[patient_df[split_col] == sv]
+               if sv is not None else patient_df)
+        sub = sub[sub[compare_col].isin(groups)]
+        if sub.empty:
+            continue
+        part = (sub.groupby([compare_col, 'cell_pair'])['integral_kontextual']
+                   .median()
+                   .unstack(compare_col))
+        part = part[[c for c in groups if c in part.columns]]
+        part.columns = [f'{sv}\n{g}' for g in part.columns]
+        parts.append(part)
+
+    if not parts:
+        return
+
+    combined = pd.concat(parts, axis=1)
+    combined = combined.reindex(row_order) if row_order is not None else combined.sort_index()
+
+    vmax = combined.abs().quantile(0.95).max()
+    n_cols = len(combined.columns)
+    fig, ax = plt.subplots(figsize=(max(4, n_cols * 1.2), max(6, len(combined) * 0.28)))
+    sns.heatmap(
+        combined, cmap='RdBu_r', center=0, vmin=-vmax, vmax=vmax,
+        ax=ax, linewidths=0.3,
+        cbar_kws={'label': 'Median integral_kontextual'})
+
+    # Vertical separators between split-level groups
+    n_groups = len(groups)
+    for i in range(1, len(parts)):
+        ax.axvline(i * n_groups, color='black', linewidth=2)
+
+    ax.set_title(title, fontsize=10)
+    ax.set_ylabel('Cell pair')
+    ax.set_xlabel('')
+    plt.tight_layout()
+    plt.savefig(out_path, format='svg', bbox_inches='tight')
+    plt.close()
+
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # 2–4 Loop over all (compare_col, split_col) combinations
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-plot_dir = os.path.join(output_dir_plots, 'kontextual')
+plot_dir = output_dir_plots
 
 for compare_col, split_col in combinations_to_run:
     print(f'\n{"="*70}')
@@ -305,6 +381,9 @@ for compare_col, split_col in combinations_to_run:
 
     if compare_col == split_col:
         print('SKIP: compare_col and split_col are the same.')
+        continue
+    if exclude_v17 and 'treatment' in (compare_col, split_col):
+        print('SKIP: treatment comparison not possible without v1.7 samples (only milder present).')
         continue
     if compare_col == 'sample_type' and sample_type_filter and sample_type_filter != 'both':
         print(f'WARNING: compare=sample_type but sample_type filter={sample_type_filter}; '
@@ -394,26 +473,34 @@ for compare_col, split_col in combinations_to_run:
     # 4. Visualisation
     # -------------------------------------------------------------------------
 
-    # 4a & 4b: Volcano and heatmap per split level
-    for sv in split_levels:
-        stat_df = stats_by_split[sv]
-        sub = (patient_df[patient_df[split_col] == sv].copy()
-               if sv is not None else patient_df.copy())
-        sub = sub[sub[compare_col].isin(groups)]
+    # 4a & 4b: Volcano per split level; single combined heatmap (or one if no split)
+    heatmap_row_order = sorted(patient_df['cell_pair'].unique())
+    base_title = f'({stype_suffix}, {suffix})'
 
+    for sv in split_levels:
+        stat_df   = stats_by_split[sv]
         split_label   = f'_{sv}' if sv is not None else ''
         title_context = f' [{split_col}={sv}]' if sv is not None else ''
-        base_title    = f'({stype_suffix}, {suffix})'
 
         plot_volcano(
             stat_df, groups, compare_col,
             title=f'Kontextual Ripley: {groups[0]} vs {groups[1]}{title_context}\n{base_title}',
             out_path=os.path.join(plot_dir, f'volcano_{file_tag}{split_label}.svg'))
 
+    if split_col is not None:
+        # Combined heatmap: columns grouped as [sv1_g1, sv1_g2, sv2_g1, sv2_g2, ...]
+        plot_combined_heatmap(
+            patient_df, split_levels, split_col, groups, compare_col,
+            title=f'Median integral_kontextual — by {split_col}\n{base_title}',
+            out_path=os.path.join(plot_dir, f'heatmap_{file_tag}.svg'),
+            row_order=heatmap_row_order)
+    else:
+        sub = patient_df[patient_df[compare_col].isin(groups)].copy()
         plot_heatmap(
             sub, groups, compare_col,
-            title=f'Median integral_kontextual{title_context}\n{base_title}',
-            out_path=os.path.join(plot_dir, f'heatmap_{file_tag}{split_label}.svg'))
+            title=f'Median integral_kontextual\n{base_title}',
+            out_path=os.path.join(plot_dir, f'heatmap_{file_tag}.svg'),
+            row_order=heatmap_row_order)
 
     # 4c: Boxplots for significant cell pairs
     #     No split  → single figure
@@ -454,7 +541,7 @@ for compare_col, split_col in combinations_to_run:
 
         sns.boxplot(
             data=sub, x='cell_pair', y='integral_kontextual',
-            hue=compare_col, hue_order=groups, palette='tab10',
+            hue=compare_col, hue_order=groups, palette='Paired',
             ax=ax, order=sig_pairs_ordered)
 
         stat_df = stats_by_split[sv]

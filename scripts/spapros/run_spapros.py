@@ -64,7 +64,7 @@ print("Using", len(valid_genes), "valid genes after removing zero-variance genes
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Set up an Evaluator
 print('Initiating evaluator...')
-evaluator = sp.ev.ProbesetEvaluator(adata, celltype_key='Neutro_Epi_extImm_pooled_A_EM', scheme="full", verbosity=2, results_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_A_EM')
+evaluator = sp.ev.ProbesetEvaluator(adata, celltype_key='Neutro_Epi_extImm_pooled_A_EM_N', scheme="full", verbosity=2, results_dir='/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros_A_EM_N')
 
 print('Evaluating...')
 evaluator.evaluate_probeset(valid_genes, set_id='xenium_io')
@@ -79,7 +79,7 @@ pickleable_data = {
     "summary": evaluator.summary_results,
 }
 
-with open("/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/evaluator_results_pooled_A_EM.pkl", "wb") as f:
+with open("/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/evaluator_results_pooled_A_EM_N.pkl", "wb") as f:
     pickle.dump(pickleable_data, f)
 
 
