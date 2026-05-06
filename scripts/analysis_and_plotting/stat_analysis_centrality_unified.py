@@ -69,7 +69,6 @@ _META_COLS = [
 ]
 
 # Non-immune cell types — excluded from immune-only analysis
-# NAN = Normal tissue Associated Neutrophils → immune, kept in immune subset
 _NON_IMMUNE = {
     'Epithelial_cell', 'Fibroblast', 'Endothelial_cell',
     'Pericyte', 'Stromal', 'Tumor_cells',

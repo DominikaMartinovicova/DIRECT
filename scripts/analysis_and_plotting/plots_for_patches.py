@@ -2,6 +2,7 @@ import scanpy as sc
 import matplotlib.pyplot as plt
 import squidpy as sq
 import spatialdata as sd
+import pandas as pd
 
 
 patch_size=5000
@@ -9,7 +10,7 @@ overlap=50
 phenotyping_level = "Neutro_Epi_extImm_pooled_A_EM_N"
 adata_type = "ctFraction"
 output_dir_plots = f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/plots/analysis/{phenotyping_level}_old/spatial/patching/{patch_size}um_{overlap}um/spatial_scatter/'
-patch = 'T24_041865_130004_3_window_0'
+patch = 'T23_004535_110005_1'
 patches = [
     "T24_040744_130003_3",
     "T24_041869_130005_3",
@@ -154,6 +155,10 @@ def apply_palette_to_obs(adata, obs_key, palette, fallback="#d3d3d3"):
     categories = adata.obs[obs_key].astype("category").cat.categories.tolist()
     adata.uns[f"{obs_key}_colors"] = [palette.get(ct, fallback) for ct in categories]
 
+def apply_highlight_palette(adata,obs_key,palette,highlight_celltypes,fallback="#d3d3d3"):
+    categories = (adata.obs[obs_key].astype("category").cat.categories.tolist())
+    adata.uns[f"{obs_key}_colors"] = [palette.get(ct, fallback) if ct in highlight_celltypes else fallback for ct in categories]
+
 
 #for patch in patches:
 #    adata = sc.read_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_sample/{phenotyping_level}/{patch}.h5ad')
@@ -163,18 +168,39 @@ def apply_palette_to_obs(adata, obs_key, palette, fallback="#d3d3d3"):
 #    plt.close()
 
 
-# create a plot of the whole slide
-sdata = sd.read_zarr("/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/phenotyped/Neutro_Epi_extImm_pooled_A_EM_N/slide_5.zarr/")
-adata = sdata.tables['table']
-# rewrite each space in cell label to _
-adata.obs[phenotyping_level] = adata.obs[phenotyping_level].str.replace(" ", "_")
-apply_palette_to_obs(adata, phenotyping_level, celltype_palette)
-sq.pl.spatial_scatter(adata,library_id="spatial",shape=None,color=phenotyping_level,size = 2,figsize=(10,10))
-#change title to "Spatial scatter of phenotyped cells in slide 5"
-plt.title("Spatial scatter of phenotyped cells in slide 5", fontsize=18)
-# make the legend bigger and two column
-legend = plt.legend(title=phenotyping_level, title_fontsize=18, fontsize=16, loc='upper right', bbox_to_anchor=(2, 1))
-legend.get_title().set_fontsize(18)
-plt.tight_layout()
-plt.savefig(f'plots/tacco/{phenotyping_level}/slide_5/' + f'/spatial_{phenotyping_level}_new.png', dpi=300, bbox_inches='tight')
+# # create a plot of the whole slide
+# sdata = sd.read_zarr("/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/phenotyped/Neutro_Epi_extImm_pooled_A_EM_N/slide_5.zarr/")
+# adata = sdata.tables['table']
+# # rewrite each space in cell label to _
+# adata.obs[phenotyping_level] = adata.obs[phenotyping_level].str.replace(" ", "_")
+# apply_palette_to_obs(adata, phenotyping_level, celltype_palette)
+# sq.pl.spatial_scatter(adata,library_id="spatial",shape=None,color=phenotyping_level,size = 2,figsize=(10,10))
+# #change title to "Spatial scatter of phenotyped cells in slide 5"
+# plt.title("Spatial scatter of phenotyped cells in slide 5", fontsize=18)
+# # make the legend bigger and two column
+# legend = plt.legend(title=phenotyping_level, title_fontsize=18, fontsize=16, loc='upper right', bbox_to_anchor=(2, 1))
+# legend.get_title().set_fontsize(18)
+# plt.tight_layout()
+# plt.savefig(f'plots/tacco/{phenotyping_level}/slide_5/' + f'/spatial_{phenotyping_level}_new.png', dpi=300, bbox_inches='tight')
+# plt.close()
+
+# plot a scatterplot for a patch and highlight only selected celltypes in their respective colors and all the other cells in light gray
+celltype_1 = 'B_cell'
+celltype_2 = 'T_cell_regulatory'
+highlight_celltypes = [celltype_1, celltype_2]
+adata = sc.read_h5ad(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_sample/{phenotyping_level}/{patch}.h5ad')
+apply_highlight_palette(adata=adata,obs_key=phenotyping_level,palette=celltype_palette,highlight_celltypes=highlight_celltypes,fallback="#d3d3d3")
+# Put non-highlighted cells first, highlighted cells last
+is_highlight = adata.obs[phenotyping_level].isin(highlight_celltypes)
+
+adata_plot = adata[pd.concat([(~is_highlight).loc[~is_highlight],   # background first 
+                              is_highlight.loc[is_highlight]        # highlighted last
+    ]).index].copy()
+
+sq.pl.spatial_scatter(adata_plot, color="Neutro_Epi_extImm_pooled_A_EM_N", size=1,shape=None,figsize=(10,10))
+plt.title(f"{patch}", fontsize=18)
+plt.savefig(output_dir_plots + f'spatial_scatter_patch_{patch}_{celltype_1}_{celltype_2}.png', dpi=300, bbox_inches='tight')
 plt.close()
+
+
+

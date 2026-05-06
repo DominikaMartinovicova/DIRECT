@@ -25,12 +25,12 @@
 # Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
 #
 # Usage:
-#   python3 plot_kontextual_fig2.py \
+#   python3 scripts/analysis_and_plotting/plot_kontextual_fig2.py \
 #       --sample T23_004535_110005_1 \
 #       --cell_pairs Tumor_cells__T_cell_CD8_functional B_cell__T_cell_regulatory \
 #       --adata data/combined/Neutro_Epi_extImm_pooled_A_EM_N_combined_adatas_for_analysis_w_v1.7.h5ad \
 #       --input_dir results/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/per_sample \
-#       --o_plots plots/...
+#       --o_plots plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/per_sample/T23_004535_110005_1/context_scatter
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -76,6 +76,7 @@ ct_col     = args.celltype_col
 out_dir    = args.output_dir_plots
 
 os.makedirs(out_dir, exist_ok=True)
+os.makedirs(args.output_dir_plots, exist_ok=True)
 
 print(f'Sample: {sample}')
 print(f'Cell pairs: {cell_pairs}')
@@ -113,7 +114,7 @@ celltype_palette = {
 # Article-style colours for Panel D roles (source=dark, target=red, parent=light gray)
 COLOR_SOURCE_DEFAULT = '#1a1a1a'   # near-black — source cells
 COLOR_TARGET_DEFAULT = '#E63946'   # red        — target cells
-COLOR_PARENT         = '#BDBDBD'   # light gray — remaining parent cells
+COLOR_PARENT         = '#d3d3d3'   # light gray — remaining parent cells
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -260,15 +261,15 @@ def plot_pair_scatter(df, pair_data, sample, type_i, type_j, cell_pair,
     n_parent = (df_plot['role'] == 'parent').sum()
 
     # Use palette colours for source and target; article-style remaining parent
-    #color_source = celltype_palette.get(type_i, COLOR_SOURCE_DEFAULT)
-    #color_target = celltype_palette.get(type_j, COLOR_TARGET_DEFAULT)
-    color_source = COLOR_SOURCE_DEFAULT
-    color_target = COLOR_TARGET_DEFAULT
+    color_source = celltype_palette.get(type_i, COLOR_SOURCE_DEFAULT)
+    color_target = celltype_palette.get(type_j, COLOR_TARGET_DEFAULT)
+    #color_source = COLOR_SOURCE_DEFAULT
+    #color_target = COLOR_TARGET_DEFAULT
 
     role_order  = ['parent', 'source', 'target']
     role_colors = {'parent': COLOR_PARENT, 'source': color_source, 'target': color_target}
-    role_sizes  = {'parent': 2,            'source': 3,            'target': 3}
-    role_alphas = {'parent': 0.8,          'source': 0.85,         'target': 0.85}
+    role_sizes  = {'parent': 4,            'source': 4,            'target': 4}
+    role_alphas = {'parent': 1,          'source': 1,         'target': 1}
     role_labels = {
         'parent': f'Remaining {parent_name} (n={n_parent:,})',
         'source': f'{type_i} (n={n_source:,})',
@@ -324,7 +325,7 @@ def plot_pair_scatter(df, pair_data, sample, type_i, type_j, cell_pair,
 
 # Panel A — once per sample
 print('Plotting Panel A (full scatter, all cell types)...')
-plot_full_scatter(df, sample, celltype_palette, out_dir)
+#plot_full_scatter(df, sample, celltype_palette, out_dir)
 
 # Panels B and D — once per cell pair
 for cell_pair in cell_pairs:
@@ -343,7 +344,7 @@ for cell_pair in cell_pairs:
     print(f'  n_source: {pair_data["n_source_cells"]}, n_target: {pair_data["n_target_cells"]}')
 
     print('  Plotting Panel B (curves)...')
-    plot_curves(pair_data, sample, type_i, type_j, cell_pair, out_dir)
+    #plot_curves(pair_data, sample, type_i, type_j, cell_pair, out_dir)
 
     print('  Plotting Panel D (pair scatter)...')
     plot_pair_scatter(df, pair_data, sample, type_i, type_j, cell_pair,
