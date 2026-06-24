@@ -1,0 +1,14 @@
+name: r_statial
+channels:
+  - bioconda
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - r-essentials
+  - r-base=4.3.1
+  - r-devtools
+  - r-magick
+  - r-concaveman
+prefix: /appdata/users/P083831/conda_envs/r_statial

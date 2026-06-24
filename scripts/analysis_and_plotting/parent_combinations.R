@@ -9,8 +9,6 @@
 #   1 Create parent combinations
 #   2 Save results
 #
-# Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
-#
 # Usage:
 #        """
 #        """

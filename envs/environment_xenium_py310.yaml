@@ -1,0 +1,26 @@
+name: xenium_py310
+channels:
+  - bioconda
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - igraph
+  - squidpy
+  - seaborn
+  - python-igraph
+  - python=3.10
+  - scanpy
+  - scipy
+  - tacco
+  - spatialdata
+  - matplotlib
+  - spatialdata-io
+  - snakemake
+  - pyarrow=21.0.0
+  - leidenalg
+  - statannotations
+  - spatialdata-plot
+  - decoupler
+prefix: /appdata/users/P083831/conda_envs/xenium_py310

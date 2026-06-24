@@ -1,0 +1,16 @@
+name: xenium_py310
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python=3.10
+  - spatialdata
+  - spatialdata-io
+  - matplotlib
+  - seaborn
+  - scanpy
+  - squidpy
+  - tacco
+  - scipy
+  - igraph
+  - python-igraph

@@ -1,5 +1,3 @@
-#from scripts.analysis_and_plotting.utils import *
-#import glob
 from snakemake.io import expand
 import pandas as pd
 
@@ -33,10 +31,6 @@ print(samples_list)
 #-------------------------------------------------------------------------------------------------------------------
 rule all:
     input:
-        #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys_T23_004535_110005_1.h5ad',
-        #data_dir + f'analyzed/{phenotyping_level}_adatas_ripleys.h5ad'
-        #out_file = expand(output_dir_results + f'analysis/{phenotyping_level}/spatial/per_sample/{{sample}}/kontextual_sim.tsv', sample='T23_004535_110005_1')
-        #parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations_immune_split.csv',
         kontextual_ripleys = expand(
             output_dir_results + f'spatial/per_sample/{{sample}}/kontextual_ripleys/kontextual_ripleys_summary.tsv',
             sample=samples_list
@@ -46,16 +40,12 @@ rule all:
 # Get parent combinations
 #-------------------------------------------------------------------------------------------------------------------
 rule parent_combinations:
-    input:
-        #adata_in = adata_processed_path
-        #adata_in = '/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/data/adata_per_patch/Neutro_Epi_extImm_pooled_A_EM_N/200um_50um/patch_T23_004535_110005_1_window_25.h5ad'
     output:
         parent_comb = data_dir + f'analyzed/{phenotyping_level}_parent_combinations_immune_split.csv'
     conda:
         "/appdata/users/P083831/conda_envs/r_statial"
     script:
         "scripts/analysis_and_plotting/parent_combinations.R"
-
 
 
 
@@ -98,13 +88,3 @@ rule kontextual_ripleys:
 #         "/appdata/users/P083831/conda_envs/r_statial"
 #     script:
 #         "scripts/analysis_and_plotting/kontextual_w_sim.R"
-
-
-
-
-
-
-
-
-
-

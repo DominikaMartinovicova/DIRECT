@@ -30,7 +30,7 @@
 #       --cell_pairs Tumor_cells__T_cell_CD8_functional B_cell__T_cell_regulatory \
 #       --adata data/combined/Neutro_Epi_extImm_pooled_A_EM_N_combined_adatas_for_analysis_w_v1.7.h5ad \
 #       --input_dir results/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/per_sample \
-#       --o_plots plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/per_sample/T23_004535_110005_1/context_scatter
+#       --o_plots plots/analysis/Neutro_Epi_extImm_pooled_A_EM_N/spatial/per_sample
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -218,10 +218,10 @@ def plot_curves(pair_data, sample, type_i, type_j, cell_pair, out_dir):
 
     ax.axhline(0, color='black', linestyle='--', linewidth=1, alpha=0.6)
 
-    ax.set_xlabel('Radius r (µm)', fontsize=11)
-    ax.set_ylabel('Relationship value (L − r)', fontsize=11)
-    ax.set_title(f'{sample}\n{type_i} → {type_j}  |  context: {parent_name}', fontsize=9)
-    ax.legend(fontsize=10, framealpha=0.7)
+    ax.set_xlabel('Radius r (µm)', fontsize=14)
+    ax.set_ylabel('Relationship value (L − r)', fontsize=14)
+    ax.set_title(f'{sample}\n{type_i} → {type_j}  |  context: {parent_name}', fontsize=14)
+    ax.legend(fontsize=13, framealpha=0.7)
 
     plt.tight_layout()
     out = os.path.join(out_dir, f'{sample}_{cell_pair}_fig2B_curves.svg')
@@ -344,10 +344,10 @@ for cell_pair in cell_pairs:
     print(f'  n_source: {pair_data["n_source_cells"]}, n_target: {pair_data["n_target_cells"]}')
 
     print('  Plotting Panel B (curves)...')
-    #plot_curves(pair_data, sample, type_i, type_j, cell_pair, out_dir)
+    plot_curves(pair_data, sample, type_i, type_j, cell_pair, out_dir)
 
     print('  Plotting Panel D (pair scatter)...')
-    plot_pair_scatter(df, pair_data, sample, type_i, type_j, cell_pair,
-                      celltype_palette, out_dir)
+    #plot_pair_scatter(df, pair_data, sample, type_i, type_j, cell_pair,
+    #                  celltype_palette, out_dir)
 
 print('\nDone.')

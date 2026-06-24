@@ -287,8 +287,9 @@ for (ti, tj), da in agg.items():
     fig, ax = plt.subplots(figsize=(5.5, 4.5))
     draw_combined(ax, da, show_sd=True, fontsize_legend=8)
 
-    ax.set_xlabel('Radius (µm)', fontsize=10)
-    ax.set_ylabel('L(r) − r', fontsize=10)
+    ax.set_xlabel('Radius (µm)', fontsize=14)
+    ax.set_ylabel('L(r) − r', fontsize=14)
+    ax.tick_params(axis='both', labelsize=12)
 
     parent_name   = da.get('parent_name') or 'unknown'
     pool_types    = da.get('perm_pool_types') or []
@@ -297,13 +298,13 @@ for (ti, tj), da in agg.items():
     ax.set_title(
         f'{SHORT_LABELS[ti]} → {SHORT_LABELS[tj]}\n'
         f'Parent pool: {parent_name}',
-        fontsize=9,
+        fontsize=14,
     )
     # Pool members as a small footnote below the axes
     fig.text(
         0.5, -0.02,
         f'Permuted within: {pool_str}',
-        ha='center', va='top', fontsize=6, color='#555555',
+        ha='center', va='top', fontsize=10, color='#555555',
         wrap=True, transform=fig.transFigure,
     )
 

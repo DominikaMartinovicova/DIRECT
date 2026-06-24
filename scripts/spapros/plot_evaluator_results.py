@@ -8,7 +8,7 @@ import seaborn as sns
 import pickle
 import holoviews as hv
 
-pheno_level = "pooled_A_EM"
+pheno_level = "pooled_A_EM_N"
 
 with open(f'/net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/results/spapros/evaluator_results_{pheno_level}.pkl', 'rb') as f:
     results = pickle.load(f)

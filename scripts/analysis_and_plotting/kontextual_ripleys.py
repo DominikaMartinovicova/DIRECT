@@ -33,7 +33,6 @@
 #   4  Main analysis loop
 #   5  Build summary table and save results
 #
-# Author: Dominika Martinovicova (d.martinovicova@amsterdamumc.nl)
 #
 # Usage:
 #   python3 /net/beegfs/groups/tgac/dmartinovicova_new/DIRECT/scripts/analysis_and_plotting/kontextual_ripleys.py \
